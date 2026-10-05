@@ -1,4 +1,19 @@
-# Testar Space Blocks 0.8.3 no Modrinth
+# Testar Space Blocks 0.9.0 no Modrinth
+
+## Tipos e travessia — 0.9.0
+
+1. Reinicie com a 0.9.0 no cliente e servidor. A instalação não fecha sua sessão.
+2. Use `/planet generate sandbox 32 flat`: confirme plano Y=64, sem árvores, cavernas ou minérios. `/planet flat` acessa o mapa legado, não esse novo planeta.
+3. Gere `earth`, `desert`, `jungle`, `mushroom`, `dirt`, `stone` e `nether`, com nomes diferentes, raio 32..128 e seeds próprias. Compare dois planetas do mesmo tipo com seeds diferentes; duas seeds iguais do mesmo tipo devem repetir a geração.
+4. Use `/planet generate frost 64 stone 777 true` e `/planet generate warm 64 stone 777 false`. Nos extremos Z, confira bioma frio/superfície nevada no primeiro. Não são polos físicos de uma esfera. No Nether, `ice_poles true` é rejeitado.
+5. Abra `/planet planets`: ciclo de tipos inclui `flat`, controle de gelo, limite de raio e seed; listagem mantém tipo. `/planet info` mostra tipo/polos/recursos. Observe a geração gradual, sem esperar pré-geração completa do mapa.
+6. Examine árvores/vegetação e cavernas nativas; compare os veios dos tipos. O `earth` usa minérios nativos diversos, enquanto tipos especializados recebem mais veios dos recursos indicados. A fundação abaixo da faixa vanilla é sólida. Construções/decoração nas emendas ainda exigem observação manual por poderem ser cortadas.
+7. Salve, feche e reabra. Confira nome, tipo, raio, seed, polos, construções e acesso pelo painel. Mundos existentes continuam no gerador legado; não são regenerados.
+8. Em um poço aberto, olhe para baixo e atravesse: a inclinação lógica deve virar para cima, mantendo direção horizontal. Repita voltando. Teste inclinações intermediárias e movimento do mouse durante a travessia.
+9. Compare `Crossing camera` ligado/desligado e `/planet shader false`/`true`. Sem animação, a inversão deve continuar funcionando. Uma borda horizontal normal não deve inverter o olhar.
+10. Em um planeta novo, habilite `/planet physics fallthrough true`. Cave até a passagem Y=-496 e abra a saída conectada pelo fundo, dentro do alcance de mineração. Os blocos da passagem e de aproximação devem ser mineráveis; a bedrock de proteção fica abaixo dela, em Y=-500/-499. Use `/planet tunnel create` se quiser preparar os dois poços para testes rápidos.
+
+Código e JAR 0.8.3 estão preservados em `C:\Dev\minecraft-space-mod-backup-0.8.3-before-presets-20261005`. Não abra planetas criados com tipos novos em uma versão anterior; para voltar a um mundo antigo, use seu save correspondente. Nenhum save da instância foi removido por esta atualização.
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 

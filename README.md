@@ -1,6 +1,43 @@
-# Space Blocks 0.8.3 — Spheretest
+# Space Blocks 0.9.0 — Spheretest
 
 Minecraft Java **1.21.1**, NeoForge **21.1.255**, **Java 21**. Um mapa plano quadrado finito, com bordas opostas conectadas, desenhado com a projeção exponencial relativa à câmera de **Jeija / Spheretest**. Armazenamento, colisões e gravidade permanecem planos.
+
+## Planetas por tipo — 0.9.0
+
+Novos planetas usam raio solicitado **32..128**, tipo, seed própria e gelo polar opcional. O gerador chama o pipeline instalado do Minecraft: ruído, superfície, carvers, árvores/vegetação, minérios e estruturas nativos. A densidade combina quatro amostras com pesos suaves para conectar X/Z; essa adaptação muda o resultado em relação à mesma seed vanilla. A decoração/estruturas nas bordas ainda podem ser cortadas. O gerador antigo permanece apenas nos planetas existentes e nos mapas legados.
+
+| Tipo | Superfície e recursos |
+| --- | --- |
+| `earth` | Biomas variados e minérios nativos diversos; polos frios por padrão |
+| `desert` | Superfície seca de areia; mais ouro e cobre |
+| `jungle` | Selva e árvores nativas; mais cobre e ferro |
+| `mushroom` | Campos de cogumelos e decoração nativa; mais carvão e ferro |
+| `dirt` | Superfície de terra; mais carvão e cobre; polos frios por padrão |
+| `stone` | Superfície de pedra; mais ferro e redstone |
+| `nether` | Geração e biomas nativos do Nether, teto aberto; mais quartzo e ouro; sem polos de gelo |
+| `flat` | Plano de testes em Y=64, sem relevo, cavernas, estruturas ou minérios |
+
+As abundâncias são veios adicionais aos minérios do bioma, não exclusividade nem porcentagem fixa garantida. Cavernas e minérios nativos ficam principalmente na faixa de altura vanilla; abaixo dela há uma fundação sólida até o fundo existente em Y=-496. O tipo Nether altera a geração/biomas, mantendo iluminação e regras da dimensão atual; não implementa atmosfera ou todas as regras da dimensão Nether.
+
+Sintaxe: `/planet generate <name> <radius> <type> [seed] [ice_poles]`. Para definir `ice_poles` explicitamente, informe também uma seed. A forma antiga sem tipo cria `earth`. Exemplos:
+
+```text
+/planet generate savanna 128 earth
+/planet generate dune 64 desert 12345 false
+/planet generate tropic 64 jungle 67890 false
+/planet generate frost 128 stone 777 true
+/planet generate fungi 32 mushroom
+/planet generate inferno 64 nether
+/planet generate sandbox 32 flat
+```
+
+Abra `/planet planets` para escolher tipo, raio, seed e `Ice poles`, gerar e teleportar. `/planet info` informa tipo/polos/recursos. O raio efetivo continua `largura / (2*pi)`: solicitar 128 produz largura 832 e raio visual aproximadamente 132,42. As faixas frias ficam nos extremos Z do plano periódico, correspondendo aos polos do atlas esquemático, sem uma simulação física de temperatura.
+
+Os planetas já salvos não são regenerados. `/planet small`, `/planet flat`, `/planet natural` e `/planet lab` continuam acessando mapas legados; para usar o gerador novo, crie um planeta novo com os comandos acima. O limite novo não redimensiona mapas legados maiores.
+
+A travessia do fundo agora inverte a inclinação do olhar junto com a velocidade vertical: olhar para baixo vira olhar para cima. A direção horizontal é mantida. A transição visual acompanha a mudança e pode ser desligada no menu; a inversão lógica funciona também sem animação e com shaders desligados. Bordas horizontais normais não invertem o olhar.
+
+[Validação e limites da 0.9.0](docs/PLANET-PRESETS-0.9.0.md).
 
 ## Visão pelo túnel e diagnóstico 0.8.3
 
@@ -22,7 +59,7 @@ Use `/planet tunnel axis` em uma área sem construções importantes, espere `Tu
 
 ## Jogar
 
-Instale apenas `spaceblocks-0.8.3.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
+Instale apenas `spaceblocks-0.9.0.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
 
 | Comando | Ação |
 | --- | --- |
@@ -60,13 +97,13 @@ WASD e mouse seguem os eixos planos. Espaço sobe e Shift desce durante voo. Bor
 
 ## Planetas e geração
 
-| Planeta | Raio visual | Mapa | X/Z | Superfície e fundo |
+| Planeta | Raio solicitado | Mapa | X/Z | Superfície e fundo |
 | --- | ---: | ---: | --- | --- |
 | Pequeno plano | 32 | 224 × 224 | [-112,112) | Y=64; travessia em Y=32 |
 | Maior plano | 256 | 1.632 × 1.632 | [-816,816) | Y=64; travessia em Y=-192 |
 | Natural | 256 | 1.632 × 1.632 | [-816,816) | Relevo variável; nível de água Y=64; bedrock entre Y=-500 e -496 |
 | Laboratório natural | 128 | 832 × 832 | [-416,416) | Terreno/cavernas; plataforma em Y=180; fundo Y=-496 |
-| Gerado pelo jogador | 32–1.024 | Calculado a partir do raio | Bordas periódicas | Seed própria; terreno/cavernas; fundo Y=-496 |
+| Novo planeta gerado | 32–128 | Calculado a partir do raio | Bordas periódicas | Tipo/seed/polos próprios; fundo Y=-496 |
 
 Altura de armazenamento: -512 a 1023. Tamanho horizontal: `ceil((R/16) × pi) × 32`, como no Spheretest.
 
@@ -158,7 +195,7 @@ $env:JAVA_HOME = 'CAMINHO_DO_SEU_JDK_21'
 .\gradlew.bat build
 ```
 
-JAR: `build/libs/spaceblocks-0.8.3.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
+JAR: `build/libs/spaceblocks-0.9.0.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
 
 Créditos: [CREDITS.md](CREDITS.md). Fórmulas, unidades, origem e histórico: [auditoria do Spheretest](docs/SPHERETEST-SOURCES.md). LGPL-2.1-or-later; licença do MDK preservada. Os vídeos são creditados; foram lidos código, histórico e transcrição, sem alegar que os vídeos inacessíveis foram assistidos.
 
