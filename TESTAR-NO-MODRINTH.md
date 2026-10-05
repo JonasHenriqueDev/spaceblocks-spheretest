@@ -1,4 +1,4 @@
-# Testar Space Blocks 0.8.0 no Modrinth
+# Testar Space Blocks 0.8.1 no Modrinth
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
@@ -11,7 +11,7 @@ Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Manten
 
 - `/planet map`: gire arrastando, amplie/reduza com a roda, alterne `Globe atlas`/`Spheretest view`, `Loaded`, `Center`, `Reset` e `Refresh`. Confira tamanho 224 no pequeno e 1632 no natural. Edite uma superfície carregada e atualize. Previsões fora do alcance não confirmam construções salvas.
 - Em um local sem construções importantes, `/planet tunnel create` substitui duas colunas de 5×5 até o fundo. Espere `Tunnel ready`, execute `/planet tunnel drop` e observe queda, deslocamento horizontal, subida na outra saída e retorno. `/planet surface` deve sair do poço. Teste no pequeno e no natural, salve e reabra.
-- Para cavar manualmente, `/planet physics fallthrough true` torna a bedrock do planeta minerável. Abra a outra saída em X + metade do tamanho do mapa, com o mesmo Z. Ligue `realistic_gravity true`, `air_drag false` e `centrifugal false` para a mesma configuração da queda demonstrada. Compare `air_drag true`, que amortece a oscilação.
+- Para cavar manualmente, `/planet physics fallthrough true` torna a bedrock do planeta minerável. Perto do fundo, observe e mine os blocos da outra saída através da conexão local; não é necessário teleportar antes para prepará-la. Enquanto ela estiver fechada, a passagem deve impedir que você seja colocado dentro da pedra. As camadas abaixo do fundo não devem formar um piso invisível com fallthrough ligado. Ligue `realistic_gravity true`, `air_drag false` e `centrifugal false` para a mesma configuração da queda demonstrada. Compare `air_drag true`, que amortece a oscilação.
 
 1. `/planet natural` e `/planet info`. Confira relevo e biomas. Use `/planet fly` para observar a curvatura e Espaço/Shift para mudar a altitude.
 2. Voo tem colisão. Para atravessar pedra: `/planet noclip true`. Para sair: `/planet noclip false`, que retorna à superfície e restaura seu modo de jogo.
@@ -54,7 +54,15 @@ Copie o JAR final para `mods` de cada run e remova versões antigas dessas pasta
 
 Verifique `PERIODIC_CLIENT_TEST_PASS`, `PERIODIC_SERVER_TEST_PASS` e `PERIODIC_NETWORK_TEST_PASS`, além dos arquivos de resultados em cada diretório. O exit code sozinho não comprova aprovação: uma falha controlada pode fechar o jogo normalmente.
 
+## Correção do túnel manual 0.8.1
+
+`runPackagedBottomClient` usa `run-bottom/saves/PeriodicTest` e somente o JAR em `mods`. Reproduz um poço local com a saída oposta fechada, seleciona/minera em sobrevivência pelos pacotes vanilla, valida alcance e atravessa. Repete no natural com bedrock abaixo do fundo ainda armazenada. Confira `BOTTOM_CLIENT_TEST_PASS` e `bottom-client-results.txt`. Não é necessário apagar seus mundos para instalar a correção.
+
+No jogo, habilite `/planet physics fallthrough true`, cave até Y=32 no pequeno ou Y=-496 no natural, mire para baixo e continue minerando a saída exibida. Se estiver voando, desligue o voo para cair após liberar a saída. Depois de atravessar, você está subindo no outro poço; olhe para cima para continuar escavando a subida.
+
 ## Recuperação
+
+A correção 0.8.1 conserva os saves existentes e o mundo de laboratório entregue anteriormente. Código, histórico e JAR 0.8.0 estão em `C:\Dev\minecraft-space-mod-backup-0.8.0-before-bottom-passage-20261005`. Para restaurar o mod, feche o jogo, retire a 0.8.1 de `mods` e recoloque somente a 0.8.0 guardada. [Resultados e limites da correção](docs/BOTTOM-PASSAGE-0.8.1.md).
 
 A entrega 0.8.0 inclui o mundo local **Space Blocks Lab 0.8.0** na instância Modrinth, em criativo e com comandos. Abra-o e use `/planet lab` para acessar as plataformas/torres e `/planet map` para o painel. Use `/planet satellite info` para consultar a sonda comum. Para testar queda, crie os dois poços com `/planet tunnel create`, aguarde `Tunnel ready` e execute `/planet tunnel drop`. Consulte [o relatório 0.8.0](docs/ATLAS-LAB-0.8.0.md) para os resultados e limitações.
 
