@@ -1,4 +1,4 @@
-# Testar Space Blocks 0.8.1 no Modrinth
+# Testar Space Blocks 0.8.2 no Modrinth
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
@@ -71,3 +71,16 @@ O código/JAR anterior à 0.8.0 está em `C:\Dev\minecraft-space-mod-backup-0.7.
 Antes da atualização, foi guardado `C:\Dev\minecraft-space-mod-backup-0.6.0-20261005`, com código, JAR 0.6.0 e saves. A tag pública `v0.6.0` conserva o código. Para voltar, feche o jogo, substitua o JAR e restaure o save correspondente do backup; um mundo já salvo com dimensões da 0.7.0 pode não carregar na versão anterior sem restaurar o save.
 
 O backup original 0.5.0 permanece em `C:\Dev\minecraft-space-mod-backup-0.5.0-20261005` e a tag `recovery-0.5.0` permanece publicada. Nenhum save original foi apagado.
+
+
+## Proporção e HUD 0.8.2
+
+1. Reinicie o jogo para carregar a 0.8.2; cliente e servidor devem usar a mesma versão. A instalação não fecha sua sessão.
+2. Em small, flat, natural e um planeta recém-gerado, consulte `/planet info`: `projection_radius` deve ser `map width / (2*pi)`. O mapa e blocos salvos não são redimensionados.
+3. Em uma área livre, execute `/planet tunnel axis`, aguarde `Tunnel ready`, compare os anéis ciano/magenta e use `/planet tunnel drop`. A conexão continua artificial pelo fundo; não espere que o tubo atravesse um centro físico.
+4. Veja o globo no canto superior direito. Ande/gire, atravesse bordas e o fundo. Confira direção e X/Z/Y contra F3. Áreas fora do alcance mostram previsão, não confirmação de construções.
+5. Abra `/planet hud` ou Mods → Space Blocks → Config. Teste tamanho, quatro cantos, margens, ON/OFF e duração/ativação da câmera. Reinicie e confira persistência. F1 deve ocultar o HUD.
+6. A travessia tem um efeito temporário de rotação e um aviso. Desative `Crossing camera` para manter a câmera normal. Não é rotação permanente do corpo, e o teleporte não foi transformado em um trajeto físico contínuo.
+7. Use `/planet map` enquanto o HUD está ativo; o pedido manual tem prioridade sobre a atualização passiva. Use `/planet leave` e confirme que o HUD desaparece no mundo padrão.
+
+A versão 0.8.1 está guardada em `C:\Dev\minecraft-space-mod-backup-0.8.1-before-axis-20261005`. Para restaurar o JAR, feche o jogo por sua conta, retire a 0.8.2 e recoloque a 0.8.1 do backup. Não é necessário apagar saves para instalar esta versão.

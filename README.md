@@ -1,10 +1,22 @@
-# Space Blocks 0.8.1 — Spheretest
+# Space Blocks 0.8.2 — Spheretest
 
 Minecraft Java **1.21.1**, NeoForge **21.1.255**, **Java 21**. Um mapa plano quadrado finito, com bordas opostas conectadas, desenhado com a projeção exponencial relativa à câmera de **Jeija / Spheretest**. Armazenamento, colisões e gravidade permanecem planos.
 
+## Proporção e orientação 0.8.2
+
+Todos os planetas usam `R efetivo = largura real do mapa / (2*pi)`, incluindo saves existentes e planetas gerados. O raio inteiro solicitado continua determinando o mapa arredondado por chunks, mas não é o raio visual final. Pequeno: mapa 224, raio solicitado 32, raio efetivo 35,65. A fórmula exponencial, a inversa de seleção, entidades, partículas, gravidade e sonda usam o mesmo raio efetivo. O atlas informa os dois valores. Essa calibração é uma alteração deliberada do parâmetro original do Spheretest.
+
+Meia largura corresponde exatamente a 180 graus no corte horizontal alinhado com o poço, em X ou Z. Isso não cria um centro físico, não remove a dependência da câmera e não garante antípodas globais para qualquer trajetória. A conexão pelo fundo continua deslocando meia largura em X e invertendo velocidade Y.
+
+O HUD mostra um globo esquemático com cores amostradas, marcador vivo, direção N/S/E/W, coordenadas e raio efetivo. Ele acompanha a posição com rotação suave. As direções são os eixos planos do Minecraft: norte=-Z, sul=+Z, leste=+X e oeste=-X. O atlas de longitude/latitude não é uma geometria global de gameplay; a borda Z tem distorção no desenho dos polos. Não mostra cavernas, todas as construções ou entidades. Amostras não carregadas são previsões. Atualiza a cada 30 segundos, sem pedir geração de chunks, com até 576 triângulos por frame.
+
+Abra `/planet hud` ou **Mods → Space Blocks → Config**. Ajuste tamanho (64..192 unidades da GUI), canto, margens, visibilidade e transição da câmera (400..2400 ms). Preferências são locais e persistem em `config/spaceblocks-hud.properties`. F1 oculta o indicador. A travessia dispara uma rotação visual suave até 180 graus e retorna à orientação padrão; é um aviso temporário da inversão, não gravidade radial. Pode ser desligada. A mudança de posição pelo fundo ainda acontece no tick do servidor.
+
+Use `/planet tunnel axis` em uma área sem construções importantes, espere `Tunnel ready` e use `/planet tunnel drop`. São dois poços físicos, com centro livre e anéis a cada 8 blocos, não uma linha gráfica apresentada como túnel pelo centro. [Verificação e limites](docs/ALIGNMENT-HUD-0.8.2.md).
+
 ## Jogar
 
-Instale apenas `spaceblocks-0.8.1.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
+Instale apenas `spaceblocks-0.8.2.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
 
 | Comando | Ação |
 | --- | --- |
@@ -26,6 +38,8 @@ Instale apenas `spaceblocks-0.8.1.jar` e habilite comandos no mundo. Os mapas e 
 | `/planet satellite launch [altitude] [speed]` | Lançar uma sonda para testar órbita; altura padrão 128 acima de Y=64; fator de velocidade padrão 1 |
 | `/planet satellite info` / `remove` | Consultar trajetória/voltas ou remover sua sonda; no laboratório, controlar a sonda comum |
 | `/planet map` | Painel 3D: arrastar para girar, roda para zoom, tamanho, raio, fundo e cobertura |
+| `/planet hud` | Configuração local do globo no HUD e da transição de câmera; também em Mods → Space Blocks → Config |
+| `/planet tunnel axis` | Criar túnel de medição com entrada ciano, saída magenta e anéis iluminados a cada 8 blocos |
 | `/planet tunnel create` | Abrir dois poços conectados, no X/Z atual e meia volta em X; substitui blocos nas duas colunas de 5×5 |
 | `/planet tunnel drop` | Cair pelo túnel criado, atravessar o fundo, subir do outro lado e voltar a cair |
 | `/planet physics realistic_gravity true` | Gravidade variável com altitude |
@@ -33,7 +47,7 @@ Instale apenas `spaceblocks-0.8.1.jar` e habilite comandos no mundo. Os mapas e 
 | `/planet physics fallthrough false` | Desligar o deslocamento ao atravessar o fundo |
 | `/planet physics air_drag false` | Remover arrasto vertical no ar de jogadores/mobs, para testar a oscilação |
 
-As opções de física aceitam `true`/`false` e são salvas por dimensão. Gravidade variável começa desligada; centrífugo ligado. **No planeta natural a travessia do fundo começa desligada.** Nos mapas planos mantém o padrão original ligado. `core` e `noclip true` desligam essa opção para a dimensão; desligar noclip não a religa automaticamente. Os comandos exigem permissão de operador/cheats.
+As opções de física aceitam `true`/`false` e são salvas por dimensão. Gravidade variável começa desligada; centrífugo ligado. **No planeta natural a travessia do fundo começa desligada.** Nos mapas planos mantém o padrão original ligado. `core` e `noclip true` desligam essa opção para a dimensão; desligar noclip não a religa automaticamente. Os comandos de servidor exigem permissão de operador/cheats. `/planet hud` é local e não exige operador.
 
 WASD e mouse seguem os eixos planos. Espaço sobe e Shift desce durante voo. Bordas mantêm velocidade e orientação; a rotação relativa do pacote evita sobrescrever movimentos do mouse feitos durante a transmissão. Veículos transportam seus passageiros juntos.
 
@@ -137,7 +151,7 @@ $env:JAVA_HOME = 'CAMINHO_DO_SEU_JDK_21'
 .\gradlew.bat build
 ```
 
-JAR: `build/libs/spaceblocks-0.8.1.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
+JAR: `build/libs/spaceblocks-0.8.2.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
 
 Créditos: [CREDITS.md](CREDITS.md). Fórmulas, unidades, origem e histórico: [auditoria do Spheretest](docs/SPHERETEST-SOURCES.md). LGPL-2.1-or-later; licença do MDK preservada. Os vídeos são creditados; foram lidos código, histórico e transcrição, sem alegar que os vídeos inacessíveis foram assistidos.
 
