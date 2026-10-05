@@ -23,7 +23,18 @@ import org.joml.Matrix4f;
  * cameras, portal recursion, stencil, cube faces or global sphere mesh.
  */
 public final class PeriodicRenderer {
-  private record Mesh(BlockPos origin, VertexBuffer[] layers) {}
+  private static final class Mesh {
+    final BlockPos origin;
+    final VertexBuffer[] layers;
+    final MeshData.SortState translucent;
+    Vec3 sortEye;
+
+    Mesh(BlockPos origin, VertexBuffer[] layers, MeshData.SortState translucent) {
+      this.origin = origin;
+      this.layers = layers;
+      this.translucent = translucent;
+    }
+  }
 
   private static final LinkedHashMap<BlockPos, Mesh> meshes = new LinkedHashMap<>(256, .75f, true);
   private static final Set<BlockPos> dirty = new HashSet<>();
@@ -52,6 +63,11 @@ public final class PeriodicRenderer {
 
   public static void frame(RenderFrameEvent.Post event) {
     var mc = Minecraft.getInstance();
+    PlanetClient.audio =
+        PlanetClient.active()
+            ? new PlanetClient.Audio(
+                PlanetClient.planet(), mc.gameRenderer.getMainCamera().getPosition())
+            : null;
     if (world != mc.level) {
       clear();
       world = mc.level;
@@ -83,7 +99,7 @@ public final class PeriodicRenderer {
             if (old != null) for (var b : old.layers) if (b != null) b.close();
             continue;
           }
-          if (y + 16 < d.bottom()) continue;
+          if (SpaceBlocks.clientSettings.fallthrough && y + 16 < d.bottom()) continue;
           if (!meshes.containsKey(origin) || dirty.contains(origin)) pending.add(origin);
         }
       }
@@ -116,6 +132,7 @@ public final class PeriodicRenderer {
     var memory = new ByteBufferBuilder[4];
     var builders = new BufferBuilder[4];
     var result = new VertexBuffer[4];
+    MeshData.SortState translucent = null;
     try {
       for (int i = 0; i < 4; i++) {
         memory[i] = new ByteBufferBuilder(65536);
@@ -151,12 +168,13 @@ public final class PeriodicRenderer {
       for (int i = 0; i < 4; i++) {
         var mesh = builders[i].build();
         if (mesh == null) continue;
+        if (i == 3) translucent = mesh.sortQuads(memory[i], VertexSorting.DISTANCE_TO_ORIGIN);
         result[i] = new VertexBuffer(VertexBuffer.Usage.STATIC);
         result[i].bind();
         result[i].upload(mesh);
       }
       VertexBuffer.unbind();
-      var old = meshes.put(origin, new Mesh(origin, result));
+      var old = meshes.put(origin, new Mesh(origin, result, translucent));
       if (old != null) for (var b : old.layers) if (b != null) b.close();
       dirty.remove(origin);
       compiled++;
@@ -178,17 +196,39 @@ public final class PeriodicRenderer {
     shader.getUniform("PlanetRadius").set((float) d.radius());
     shader.getUniform("Eye").set((float) eye.x, (float) eye.y, (float) eye.z);
     try {
-      for (var mesh : meshes.values()) {
+      var ordered = new ArrayList<>(meshes.values());
+      if (layer == 3)
+        ordered.sort(
+            Comparator.comparingDouble(
+                (Mesh m) ->
+                    -projectedDistance(
+                        d, eye, m.origin.getX() + 8, m.origin.getY() + 8, m.origin.getZ() + 8)));
+      for (var mesh : ordered) {
         var p = mesh.origin;
         var offset = PeriodicMath.nearest(p.getX(), p.getZ(), eye.x, eye.z, d.size());
         if (Math.hypot(p.getX() + offset.x() - eye.x, p.getZ() + offset.z() - eye.z)
                 > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0)
-            || p.getY() + 16 < d.bottom()) continue;
+            || SpaceBlocks.clientSettings.fallthrough && p.getY() + 16 < d.bottom()) continue;
         var buffer = mesh.layers[layer];
         if (buffer == null) continue;
         shader.CHUNK_OFFSET.set(
             (float) (p.getX() + offset.x()), (float) p.getY(), (float) (p.getZ() + offset.z()));
         buffer.bind();
+        if (layer == 3
+            && mesh.translucent != null
+            && (mesh.sortEye == null || d.delta(eye, mesh.sortEye).lengthSqr() > 1)) {
+          try (var memory = new ByteBufferBuilder(32768)) {
+            final double ox = p.getX() + offset.x(), oz = p.getZ() + offset.z();
+            var sorted =
+                mesh.translucent.buildSortedIndexBuffer(
+                    memory,
+                    VertexSorting.byDistance(
+                        v ->
+                            (float) projectedDistance(d, eye, ox + v.x, p.getY() + v.y, oz + v.z)));
+            if (sorted != null) buffer.uploadIndexBuffer(sorted);
+          }
+          mesh.sortEye = eye;
+        }
         buffer.drawWithShader(view, projection, shader);
         drawn++;
       }
@@ -196,6 +236,12 @@ public final class PeriodicRenderer {
       VertexBuffer.unbind();
       type.clearRenderState();
     }
+  }
+
+  private static double projectedDistance(Planet d, Vec3 eye, double x, double y, double z) {
+    var flat = d.delta(eye, new Vec3(x, y, z));
+    var q = PeriodicMath.project(flat.x, flat.y, flat.z, d.radius());
+    return q.x() * q.x() + q.y() * q.y() + q.z() * q.z();
   }
 
   @SuppressWarnings("unchecked")

@@ -18,6 +18,15 @@ public final class PlanetCommands {
             .executes(c -> enter(c.getSource(), false));
     root.then(literal("large").executes(c -> enter(c.getSource(), false)));
     root.then(literal("small").executes(c -> enter(c.getSource(), true)));
+    root.then(literal("natural").executes(c -> enterDimension(c.getSource(), SpaceBlocks.NATURAL)));
+    root.then(literal("flat").executes(c -> enterDimension(c.getSource(), SpaceBlocks.LARGE)));
+    root.then(literal("core").executes(c -> core(c.getSource())));
+    root.then(literal("surface").executes(c -> surface(c.getSource())));
+    root.then(
+        literal("noclip")
+            .then(
+                argument("enabled", BoolArgumentType.bool())
+                    .executes(c -> noclip(c.getSource(), BoolArgumentType.getBool(c, "enabled")))));
     root.then(literal("leave").executes(c -> leave(c.getSource())));
     root.then(
         literal("fly")
@@ -93,8 +102,15 @@ public final class PlanetCommands {
 
   public static int enter(CommandSourceStack source, boolean small)
       throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    return enterDimension(source, small ? SpaceBlocks.SMALL : SpaceBlocks.NATURAL);
+  }
+
+  private static int enterDimension(
+      CommandSourceStack source,
+      net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension)
+      throws com.mojang.brigadier.exceptions.CommandSyntaxException {
     var p = source.getPlayerOrException();
-    var level = source.getServer().getLevel(small ? SpaceBlocks.SMALL : SpaceBlocks.LARGE);
+    var level = source.getServer().getLevel(dimension);
     if (level == null) {
       source.sendFailure(Component.literal("Planet dimension unavailable."));
       return 0;
@@ -111,11 +127,93 @@ public final class PlanetCommands {
       data.putBoolean("planet_return_flying", p.getAbilities().flying);
     }
     level.getChunk(0, 0);
-    p.teleportTo(level, .5, Planet.SURFACE + 2, .5, Set.of(), 0, 0);
+    int spawnY =
+        level.getHeight(
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 0, 0)
+            + 1;
+    p.teleportTo(level, .5, spawnY, .5, Set.of(), 0, 0);
     p.setDeltaMovement(Vec3.ZERO);
     setFlight(p, false);
     PlanetNetwork.sync(p);
     PlanetServer.reset(p);
+    return 1;
+  }
+
+  private static int core(CommandSourceStack source)
+      throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    var p = source.getPlayerOrException();
+    if (Planet.of(p.level()) == null) {
+      source.sendFailure(Component.literal("Enter a planet first."));
+      return 0;
+    }
+    var settings = PlanetSettings.get(p.level());
+    settings.fallthrough = false;
+    settings.setDirty();
+    int y = -472;
+    var level = p.serverLevel();
+    for (int x = -2; x <= 2; x++)
+      for (int z = -2; z <= 2; z++)
+        for (int dy = 0; dy <= 4; dy++)
+          level.setBlock(
+              new net.minecraft.core.BlockPos(x, y + dy, z),
+              (dy == 0 || dy == 4 || Math.abs(x) == 2 || Math.abs(z) == 2)
+                  ? net.minecraft.world.level.block.Blocks.SEA_LANTERN.defaultBlockState()
+                  : net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),
+              3);
+    p.connection.teleport(.5, y + 1, .5, p.getYRot(), p.getXRot());
+    p.setDeltaMovement(Vec3.ZERO);
+    setFlight(p, true);
+    for (var player : level.players()) PlanetNetwork.sync(player);
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "Deep core chamber. Fallthrough disabled. The exponential projection has no finite"
+                    + " geometric center. Use /planet surface to return."),
+        false);
+    return 1;
+  }
+
+  private static int surface(CommandSourceStack source)
+      throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    var p = source.getPlayerOrException();
+    if (Planet.of(p.level()) == null) return 0;
+    int x = p.blockPosition().getX(), z = p.blockPosition().getZ();
+    int y =
+        p.serverLevel()
+                .getHeight(
+                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    x,
+                    z)
+            + 1;
+    p.connection.teleport(p.getX(), y, p.getZ(), p.getYRot(), p.getXRot());
+    p.setDeltaMovement(Vec3.ZERO);
+    return 1;
+  }
+
+  private static int noclip(CommandSourceStack source, boolean enabled)
+      throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    var p = source.getPlayerOrException();
+    if (Planet.of(p.level()) == null) {
+      source.sendFailure(Component.literal("Enter a planet first."));
+      return 0;
+    }
+    var data = p.getPersistentData();
+    if (enabled) {
+      if (!data.contains("planet_noclip_mode"))
+        data.putString("planet_noclip_mode", p.gameMode.getGameModeForPlayer().getName());
+      p.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
+      var settings = PlanetSettings.get(p.level());
+      settings.fallthrough = false;
+      settings.setDirty();
+      for (var player : p.serverLevel().players()) PlanetNetwork.sync(player);
+    } else if (data.contains("planet_noclip_mode")) {
+      // Return to a safe surface before restoring physical collisions.
+      surface(source);
+      p.setGameMode(
+          net.minecraft.world.level.GameType.byName(data.getString("planet_noclip_mode")));
+      data.remove("planet_noclip_mode");
+    }
+    source.sendSuccess(() -> Component.literal("noclip=" + enabled), false);
     return 1;
   }
 
@@ -124,6 +222,11 @@ public final class PlanetCommands {
     var p = source.getPlayerOrException();
     if (Planet.of(p.level()) == null) return 0;
     var data = p.getPersistentData();
+    if (data.contains("planet_noclip_mode")) {
+      p.setGameMode(
+          net.minecraft.world.level.GameType.byName(data.getString("planet_noclip_mode")));
+      data.remove("planet_noclip_mode");
+    }
     var target =
         net.minecraft.resources.ResourceLocation.tryParse(
             data.getString("planet_return_dimension"));

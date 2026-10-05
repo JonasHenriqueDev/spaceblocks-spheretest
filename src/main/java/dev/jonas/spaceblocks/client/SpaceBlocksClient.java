@@ -39,6 +39,7 @@ public final class SpaceBlocksClient {
     NeoForge.EVENT_BUS.addListener(PeriodicRenderer::frame);
     NeoForge.EVENT_BUS.addListener(PeriodicRenderer::stage);
     NeoForge.EVENT_BUS.addListener(PlanetClientTests::tick);
+    NeoForge.EVENT_BUS.addListener(PlanetNetworkClientTests::tick);
     NeoForge.EVENT_BUS.addListener(PlanetClientTests::frame);
     NeoForge.EVENT_BUS.addListener(
         (ViewportEvent.RenderFog e) -> {

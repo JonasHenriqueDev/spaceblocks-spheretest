@@ -62,9 +62,32 @@ public final class PlanetServer {
       e.fallDistance = 0;
     }
     if (x == e.getX() && z == e.getZ() && y == e.getY()) return;
+    double shiftX = x - e.getX(), shiftY = y - e.getY(), shiftZ = z - e.getZ();
+    if (e instanceof net.minecraft.world.entity.Mob mob) {
+      var path = mob.getNavigation().getPath();
+      if (path != null)
+        for (int i = 0; i < path.getNodeCount(); i++) {
+          var old = path.getNode(i);
+          var node =
+              new net.minecraft.world.level.pathfinder.Node(
+                  old.x + (int) shiftX, old.y + (int) shiftY, old.z + (int) shiftZ);
+          node.type = old.type;
+          node.costMalus = old.costMalus;
+          path.replaceNode(i, node);
+        }
+    }
     if (e instanceof ServerPlayer p) {
       p.serverLevel().getChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
-      p.connection.teleport(x, y, z, p.getYRot(), p.getXRot());
+      // Zero relative rotation keeps mouse input made while the packet is in flight.
+      p.connection.teleport(
+          x,
+          y,
+          z,
+          p.getYRot(),
+          p.getXRot(),
+          Set.of(
+              net.minecraft.world.entity.RelativeMovement.X_ROT,
+              net.minecraft.world.entity.RelativeMovement.Y_ROT));
       p.setDeltaMovement(velocity);
       p.serverLevel().getChunkSource().move(p);
       p.connection.resetPosition();
@@ -74,6 +97,12 @@ public final class PlanetServer {
       e.teleportTo(x, y, z);
       e.setDeltaMovement(velocity);
       e.hasImpulse = true;
+      for (var passenger : e.getIndirectPassengers())
+        if (passenger instanceof ServerPlayer rider) {
+          rider.connection.send(new ClientboundMoveVehiclePacket(e));
+          rider.connection.resetPosition();
+          rider.serverLevel().getChunkSource().move(rider);
+        }
     }
   }
 
@@ -119,9 +148,8 @@ public final class PlanetServer {
           var c = new ChunkPos(key);
           level.getChunkSource().addRegionTicket(PERIODIC, c, 2, c, true);
           var chunk = level.getChunkSource().getChunkNow(c.x, c.z);
-          if (chunk == null) {
-            chunk = level.getChunk(c.x, c.z);
-          }
+          // Tickets schedule generation. Never wait for a new terrain chunk on the server tick.
+          if (chunk == null) continue;
           player.connection.send(
               new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null));
           sent.add(key);

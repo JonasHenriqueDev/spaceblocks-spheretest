@@ -35,6 +35,16 @@ neoForge {
             programArgument '--nogui'
             systemProperty 'spaceblocks.testServer', 'true'
         }
+        periodicNetworkServer {
+            server(); loadedMods = []; gameDirectory = project.file('run-network-server')
+            programArgument '--nogui'
+            systemProperty 'spaceblocks.testNetworkServer', 'true'
+        }
+        periodicNetworkClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-network-client')
+            programArguments.addAll '--quickPlayMultiplayer', '127.0.0.1:25580', '--width', '1280', '--height', '720'
+            systemProperty 'spaceblocks.testNetworkClient', 'true'
+        }
     }
     mods { "${mod_id}" { sourceSet(sourceSets.main) } }
 }

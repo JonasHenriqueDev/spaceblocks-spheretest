@@ -18,24 +18,31 @@ public final class SpaceBlocks {
   public static final Logger LOGGER = LogUtils.getLogger();
   public static final ResourceKey<Level>
       SMALL = ResourceKey.create(Registries.DIMENSION, id("periodic_small")),
-      LARGE = ResourceKey.create(Registries.DIMENSION, id("periodic_large"));
+      LARGE = ResourceKey.create(Registries.DIMENSION, id("periodic_large")),
+      NATURAL = ResourceKey.create(Registries.DIMENSION, id("periodic_natural"));
   public static final PlanetSettings clientSettings = new PlanetSettings();
   private static final DeferredRegister<MapCodec<? extends ChunkGenerator>> GENERATORS =
       DeferredRegister.create(Registries.CHUNK_GENERATOR, MOD_ID);
+  private static final DeferredRegister<
+          MapCodec<? extends net.minecraft.world.level.biome.BiomeSource>>
+      BIOMES = DeferredRegister.create(Registries.BIOME_SOURCE, MOD_ID);
 
   static {
     GENERATORS.register("periodic", () -> PlanetGenerator.CODEC);
+    BIOMES.register("periodic", () -> PeriodicBiomeSource.CODEC);
   }
 
   public SpaceBlocks(IEventBus bus) {
     GENERATORS.register(bus);
+    BIOMES.register(bus);
     bus.addListener(PlanetNetwork::register);
     NeoForge.EVENT_BUS.addListener(PlanetCommands::register);
     NeoForge.EVENT_BUS.addListener(PlanetServer::tick);
     NeoForge.EVENT_BUS.addListener(PlanetServer::stopped);
     NeoForge.EVENT_BUS.addListener(PlanetTests::started);
+    NeoForge.EVENT_BUS.addListener(PlanetNetworkTests::joined);
     LOGGER.info(
-        "Space Blocks 0.6.0: Jeija/Spheretest periodic flat map and camera-relative exponential"
+        "Space Blocks 0.7.0: Jeija/Spheretest periodic terrain and camera-relative exponential"
             + " projection");
   }
 

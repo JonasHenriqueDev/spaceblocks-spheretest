@@ -13,7 +13,19 @@ public final class PlanetSettings extends SavedData {
 
   public static PlanetSettings get(Level level) {
     return level instanceof ServerLevel s
-        ? s.getDataStorage().computeIfAbsent(FACTORY, "spaceblocks_physics")
+        ? s.getDataStorage()
+            .computeIfAbsent(
+                level.dimension().equals(SpaceBlocks.NATURAL)
+                    ? new Factory<>(
+                        () -> {
+                          var result = new PlanetSettings();
+                          result.fallthrough = false;
+                          return result;
+                        },
+                        PlanetSettings::load,
+                        null)
+                    : FACTORY,
+                "spaceblocks_physics")
         : SpaceBlocks.clientSettings;
   }
 

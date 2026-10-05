@@ -13,17 +13,27 @@ public final class ProjectedConsumer implements VertexConsumer {
   private final VertexConsumer target;
   private final Matrix4f inverseView, view;
   private final int radius;
+  private final int period;
 
   public ProjectedConsumer(VertexConsumer target, Matrix4f view, int radius) {
+    this(target, view, radius, 0);
+  }
+
+  public ProjectedConsumer(VertexConsumer target, Matrix4f view, int radius, int period) {
     this.target = target;
     this.view = new Matrix4f(view);
     this.inverseView = new Matrix4f(view).invert();
     this.radius = radius;
+    this.period = period;
   }
 
   @Override
   public VertexConsumer addVertex(float x, float y, float z) {
     var flat = inverseView.transformPosition(new Vector3f(x, y, z));
+    if (period > 0) {
+      flat.x = (float) PeriodicMath.wrap(flat.x, period);
+      flat.z = (float) PeriodicMath.wrap(flat.z, period);
+    }
     var p = PeriodicMath.project(flat.x, flat.y, flat.z, radius);
     var transformed =
         view.transformPosition(new Vector3f((float) p.x(), (float) p.y(), (float) p.z()));

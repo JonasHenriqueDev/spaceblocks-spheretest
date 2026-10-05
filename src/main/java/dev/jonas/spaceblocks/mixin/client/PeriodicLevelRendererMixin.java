@@ -14,6 +14,15 @@ import org.spongepowered.asm.mixin.injection.callback.*;
 
 @Mixin(LevelRenderer.class)
 abstract class PeriodicLevelRendererMixin {
+  @Redirect(
+      method =
+          "addParticleInternal(Lnet/minecraft/core/particles/ParticleOptions;ZZDDDDDD)Lnet/minecraft/client/particle/Particle;",
+      at = @At(value = "INVOKE", target = "Lnet/minecraft/world/phys/Vec3;distanceToSqr(DDD)D"))
+  private double periodicParticleDistance(Vec3 eye, double x, double y, double z) {
+    var d = PlanetClient.planet();
+    return d == null ? eye.distanceToSqr(x, y, z) : d.delta(eye, new Vec3(x, y, z)).lengthSqr();
+  }
+
   @Inject(method = "compileSections", at = @At("HEAD"), cancellable = true)
   private void skipFlatMeshing(CallbackInfo ci) {
     if (PlanetClient.active()) ci.cancel();

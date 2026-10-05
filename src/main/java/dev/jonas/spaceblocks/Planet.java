@@ -5,15 +5,22 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-public record Planet(int radius) {
+public record Planet(int radius, int depth) {
+  public Planet(int radius) {
+    this(radius, radius);
+  }
+
   public static final int SURFACE = 64;
   public static final Planet SMALL = new Planet(32), LARGE = new Planet(256);
+  public static final Planet NATURAL = new Planet(256, 560);
 
   public static Planet of(Level level) {
     if (level == null) return null;
     return level.dimension().equals(SpaceBlocks.SMALL)
         ? SMALL
-        : level.dimension().equals(SpaceBlocks.LARGE) ? LARGE : null;
+        : level.dimension().equals(SpaceBlocks.LARGE)
+            ? LARGE
+            : level.dimension().equals(SpaceBlocks.NATURAL) ? NATURAL : null;
   }
 
   public int size() {
@@ -21,7 +28,7 @@ public record Planet(int radius) {
   }
 
   public int bottom() {
-    return SURFACE - radius;
+    return SURFACE - depth;
   }
 
   public BlockPos canonical(BlockPos p) {

@@ -12,7 +12,18 @@
     "PeriodicCollisionMixin",
     "PeriodicEntityDistanceMixin",
     "PeriodicInteractionMixin",
-    "PeriodicExplosionMixin"
+    "PeriodicExplosionMixin",
+    "PeriodicBroadcastMixin",
+    "PeriodicNavigationMixin",
+    "PeriodicNavigationRegionMixin",
+    "PeriodicVehicleConnectionMixin",
+    "PeriodicScheduledTicksMixin",
+    "PeriodicServerParticlesMixin",
+    "PeriodicMoveControlMixin",
+    "PeriodicLookControlMixin",
+    "PeriodicSightMixin",
+    "PeriodicPortalMixin",
+    "PeriodicPortalSearchMixin"
   ],
   "client": [
     "client.PeriodicChunkCacheMixin",
@@ -23,7 +34,9 @@
     "client.PeriodicTeleportMixin",
     "client.PeriodicGamePickMixin",
     "client.PeriodicBreakingMixin",
-    "client.PeriodicParticlesMixin"
+    "client.PeriodicParticlesMixin",
+    "client.PeriodicSoundMixin",
+    "client.PeriodicSoundEngineMixin"
   ],
   "injectors": {
     "defaultRequire": 1

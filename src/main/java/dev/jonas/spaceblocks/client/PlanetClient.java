@@ -8,6 +8,9 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.*;
 
 public final class PlanetClient {
+  public record Audio(Planet planet, Vec3 eye) {}
+
+  public static volatile Audio audio;
   public static Vec3 beforeTeleport;
 
   public static void restoreVelocity(PlanetNetwork.Velocity packet) {

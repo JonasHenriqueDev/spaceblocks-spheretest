@@ -21,6 +21,7 @@ public final class PlanetClientTests {
   private static double deepest = Double.POSITIVE_INFINITY;
   private static int mined;
   private static boolean deepStopped;
+  private static volatile Vec3 netherPortal;
   private static final List<String> results = new ArrayList<>();
 
   private static void check(boolean ok, String message) {
@@ -62,14 +63,15 @@ public final class PlanetClientTests {
   }
 
   private static void resetShaft() {
-    server(p -> {
-      var level = p.serverLevel();
-      var generator = (PlanetGenerator) level.getChunkSource().getGenerator();
-      for (int y = generator.planet.bottom() + 1; y <= 64; y++)
-        for (int x = 49; x <= 51; x++)
-          for (int z = 49; z <= 51; z++)
-            level.setBlock(new BlockPos(x, y, z), generator.block(y), 3);
-    });
+    server(
+        p -> {
+          var level = p.serverLevel();
+          var generator = (PlanetGenerator) level.getChunkSource().getGenerator();
+          for (int y = generator.planet.bottom() + 1; y <= 64; y++)
+            for (int x = 49; x <= 51; x++)
+              for (int z = 49; z <= 51; z++)
+                level.setBlock(new BlockPos(x, y, z), generator.block(y), 3);
+        });
   }
 
   private static void capture(String name) {
@@ -107,7 +109,7 @@ public final class PlanetClientTests {
                   .getCodeSource()
                   .getLocation()
                   .toString()
-                  .contains("spaceblocks-0.6.0.jar"),
+                  .contains("spaceblocks-0.7.0.jar"),
               "Loaded final packaged JAR, not development classes");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);
@@ -288,7 +290,7 @@ public final class PlanetClientTests {
                         .stream()
                         .anyMatch(pig -> pig.getHealth() < pig.getMaxHealth()),
                     "Actual entity interaction packet across edge"));
-      if (ticks == 1360) command("planet large");
+      if (ticks == 1360) command("planet flat");
       if (ticks == 1480) {
         check(PlanetClient.planet() == Planet.LARGE, "Large planet command and dimension");
         command("planet fly");
@@ -342,11 +344,119 @@ public final class PlanetClientTests {
       }
       if (ticks == 2060) {
         check(PlanetClient.planet() == null, "Return command restores standard world");
+        command("planet natural");
+      }
+      if (ticks == 2220) {
+        check(mc.level.dimension().equals(SpaceBlocks.NATURAL), "Natural planet client entry");
+        check(
+            !SpaceBlocks.clientSettings.fallthrough,
+            "Natural core exploration has no automatic bottom teleport");
+        command("planet fly");
+        teleport(0.5, 180, 0.5, 0, 70);
+      }
+      if (ticks == 2280) {
+        capture("periodic-natural-relief");
+        check(PeriodicRenderer.drawn > 0, "Natural terrain rendered");
+        command("planet core");
+      }
+      if (ticks == 2400) {
+        check(
+            mc.player.getY() < -460 && mc.player.getAbilities().flying,
+            "Deep core chamber accessible: y="
+                + mc.player.getY()
+                + ", flying="
+                + mc.player.getAbilities().flying);
+        capture("periodic-natural-core");
+        command("planet noclip true");
+      }
+      if (ticks == 2460) {
+        check(mc.player.isSpectator(), "Noclip enables collision-free interior exploration");
+        teleport(10.5, -300, 10.5, 0, 0);
+      }
+      if (ticks == 2520) {
+        check(mc.player.getY() < -290, "Noclip occupies deep terrain without collision");
+        command("planet noclip false");
+      }
+      if (ticks == 2600) {
+        check(
+            !mc.player.isSpectator() && mc.player.getY() > 40,
+            "Noclip off safely returns to surface and restores game mode");
+        command("planet leave");
+      }
+      if (ticks == 2640) {
+        check(PlanetClient.planet() == null, "Natural planet leave restores standard world");
+        command("planet flat");
+      }
+      if (ticks == 2740)
+        server(
+            p -> {
+              var boat = EntityType.BOAT.create(p.level());
+              boat.setNoGravity(true);
+              boat.moveTo(814.5, 100, 50.5, -90, 0);
+              p.serverLevel().addFreshEntity(boat);
+              p.connection.teleport(814.5, 100, 50.5, -90, 0);
+              p.startRiding(boat, true);
+            });
+      if (ticks == 2820) {
+        check(mc.player.isPassenger(), "Client mounted boat");
+        mc.options.keyUp.setDown(true);
+      }
+      if (ticks == 2920) {
+        mc.options.keyUp.setDown(false);
+        check(
+            mc.player.isPassenger() && mc.player.getRootVehicle().getX() < 0,
+            "Player-controlled boat crosses seam without dismounting");
+        capture("periodic-boat-seam");
+        server(p -> p.stopRiding());
+        command("planet leave");
+      }
+      if (ticks == 2980) {
+        command("planet natural");
+      }
+      if (ticks == 3100)
+        server(
+            p -> {
+              var rectangle =
+                  p.serverLevel()
+                      .getPortalForcer()
+                      .createPortal(new BlockPos(20, 150, 20), Direction.Axis.X)
+                      .orElseThrow();
+              p.getAbilities().flying = true;
+              p.onUpdateAbilities();
+              p.connection.teleport(
+                  rectangle.minCorner.getX() + .5,
+                  rectangle.minCorner.getY() + .1,
+                  rectangle.minCorner.getZ() + .5,
+                  0,
+                  0);
+            });
+      if (ticks == 3260) {
+        check(
+            mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER),
+            "Actual Nether portal from natural planet");
+        server(
+            p -> {
+              netherPortal = p.position();
+              p.getAbilities().flying = true;
+              p.onUpdateAbilities();
+              p.connection.teleport(p.getX() + 8, p.getY() + 8, p.getZ(), 0, 0);
+            });
+      }
+      if (ticks == 3620)
+        server(p -> p.connection.teleport(netherPortal.x, netherPortal.y, netherPortal.z, 0, 0));
+      if (ticks == 3780) {
+        check(
+            mc.level.dimension().equals(SpaceBlocks.NATURAL),
+            "Actual Nether portal returns to originating planet");
+        capture("periodic-nether-return");
+        command("planet leave");
+      }
+      if (ticks == 3860) {
         Files.write(mc.gameDirectory.toPath().resolve("periodic-client-results.txt"), results);
         SpaceBlocks.LOGGER.info("PERIODIC_CLIENT_TEST_PASS");
         mc.stop();
       }
-      if (ticks > 2400) throw new IllegalStateException("Client harness timeout");
+      if (ticks > 4200) throw new IllegalStateException("Client harness timeout");
     } catch (Throwable ex) {
       fail(ex);
     }
