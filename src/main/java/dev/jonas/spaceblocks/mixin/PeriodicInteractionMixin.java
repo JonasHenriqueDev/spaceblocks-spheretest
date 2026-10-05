@@ -14,8 +14,8 @@ abstract class PeriodicInteractionMixin {
     var p = (Player) (Object) this;
     var d = Planet.of(p.level());
     if (d == null) return pos;
-    var o = PeriodicMath.nearest(pos.getX(), pos.getZ(), p.getX(), p.getZ(), d.size());
-    return pos.offset(o.x(), 0, o.z());
+    var view = BottomPassage.nearest(p.level(), p.getEyePosition(), Vec3.atCenterOf(pos));
+    return BlockPos.containing(view);
   }
 
   @ModifyVariable(

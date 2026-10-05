@@ -48,6 +48,12 @@ neoForge {
             systemProperty 'spaceblocks.labClient', 'true'
             systemProperty 'spaceblocks.verifyPersistence', providers.gradleProperty('verifyPersistence').getOrElse('false')
         }
+        packagedBottomClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-bottom')
+            programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '900'
+            systemProperty 'spaceblocks.testClient', 'true'
+            systemProperty 'spaceblocks.bottomClient', 'true'
+        }
         periodicPerformanceClient {
             client(); loadedMods = []; gameDirectory = project.file('run-performance')
             programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '720'

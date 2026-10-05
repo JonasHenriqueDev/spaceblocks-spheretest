@@ -13,11 +13,18 @@ uniform mat4 ProjMat;
 uniform vec3 ChunkOffset;
 uniform vec3 Eye;
 uniform float PlanetRadius;
+uniform float BottomPass;
+uniform float BottomY;
+uniform vec2 BottomLight;
+out float sourceY;
 out float vertexDistance;
 out vec4 vertexColor;
 out vec2 texCoord0;
 void main() {
-    vec3 planar = Position + ChunkOffset - Eye;
+    vec3 world = Position + ChunkOffset;
+    sourceY = world.y;
+    if (BottomPass > 0.5) world.y = 2.0 * BottomY - world.y;
+    vec3 planar = world - Eye;
     float distance = length(planar.xz);
     float angle = distance / PlanetRadius;
     float radial = PlanetRadius * exp(planar.y / PlanetRadius);
@@ -25,6 +32,8 @@ void main() {
     vec3 pos = vec3(planar.x * factor, radial * cos(angle) - PlanetRadius, planar.z * factor);
     gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
     vertexDistance = length(pos);
-    vertexColor = Color * minecraft_sample_lightmap(Sampler2, UV2);
+    ivec2 light = UV2;
+    if (BottomPass > 0.5) light = max(light, ivec2(BottomLight));
+    vertexColor = Color * minecraft_sample_lightmap(Sampler2, light);
     texCoord0 = UV0;
 }

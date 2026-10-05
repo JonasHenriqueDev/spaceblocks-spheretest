@@ -33,6 +33,13 @@ public final class ProjectedConsumer implements VertexConsumer {
     if (period > 0) {
       flat.x = (float) PeriodicMath.wrap(flat.x, period);
       flat.z = (float) PeriodicMath.wrap(flat.z, period);
+      var mc = net.minecraft.client.Minecraft.getInstance();
+      var eye = mc.gameRenderer.getMainCamera().getPosition();
+      var nearby =
+          dev.jonas.spaceblocks.BottomPassage.nearest(
+                  mc.level, eye, eye.add(flat.x, flat.y, flat.z))
+              .subtract(eye);
+      flat.set((float) nearby.x, (float) nearby.y, (float) nearby.z);
     }
     var p = PeriodicMath.project(flat.x, flat.y, flat.z, radius);
     var transformed =

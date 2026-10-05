@@ -85,7 +85,7 @@ public final class PlanetAtlasClientTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.0.jar"),
+                .contains("spaceblocks-0.8.1.jar"),
             "Packaged atlas JAR loaded");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);

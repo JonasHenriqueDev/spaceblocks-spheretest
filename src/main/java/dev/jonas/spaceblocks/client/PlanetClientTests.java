@@ -96,6 +96,10 @@ public final class PlanetClientTests {
   }
 
   public static void tick(ClientTickEvent.Post e) {
+    if (Boolean.getBoolean("spaceblocks.bottomClient")) {
+      PlanetBottomClientTests.tick();
+      return;
+    }
     if (Boolean.getBoolean("spaceblocks.labClient")) {
       PlanetLabClientTests.tick();
       return;
@@ -121,7 +125,7 @@ public final class PlanetClientTests {
                   .getCodeSource()
                   .getLocation()
                   .toString()
-                  .contains("spaceblocks-0.8.0.jar"),
+                  .contains("spaceblocks-0.8.1.jar"),
               "Loaded final packaged JAR, not development classes");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);
@@ -346,11 +350,22 @@ public final class PlanetClientTests {
         check(deepest < -150 && mined > 200, "Client deep mining in large planet without crash");
         capture("periodic-large-deep-mining");
         command("planet fly");
+        server(
+            p -> {
+              var d = Planet.of(p.level());
+              int opposite = PeriodicMath.wrap(d.size() / 2, d.size());
+              for (int x = -1; x <= 1; x++)
+                for (int z = -1; z <= 1; z++)
+                  for (int y = d.bottom(); y <= d.bottom() + 4; y++)
+                    p.level()
+                        .setBlock(
+                            new BlockPos(opposite + x, y, z), Blocks.AIR.defaultBlockState(), 3);
+            });
         teleport(.5, -193, .5, 0, 0);
       }
       if (ticks == 2020) {
         check(
-            mc.player.getY() > -192 && Math.abs(mc.player.getX()) > 800,
+            mc.player.getY() >= -192 && Math.abs(mc.player.getX()) > 800,
             "Client/server fallthrough and half-map horizontal shift");
         command("planet leave");
       }

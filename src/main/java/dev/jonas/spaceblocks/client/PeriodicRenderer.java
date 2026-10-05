@@ -4,13 +4,13 @@ import com.mojang.blaze3d.vertex.*;
 import dev.jonas.spaceblocks.*;
 import java.util.*;
 import java.util.concurrent.*;
-import net.minecraft.client.renderer.chunk.RenderChunkRegion;
-import net.minecraft.client.renderer.chunk.RenderRegionCache;
-import net.minecraft.core.SectionPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.chunk.RenderChunkRegion;
+import net.minecraft.client.renderer.chunk.RenderRegionCache;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.RenderShape;
@@ -32,6 +32,7 @@ public final class PeriodicRenderer {
     final VertexBuffer[] layers;
     final MeshData.SortState translucent;
     Vec3 sortEye;
+    boolean sortMirrored;
 
     Mesh(BlockPos origin, VertexBuffer[] layers, MeshData.SortState translucent) {
       this.origin = origin;
@@ -42,21 +43,29 @@ public final class PeriodicRenderer {
 
   private static final LinkedHashMap<BlockPos, Mesh> meshes = new LinkedHashMap<>(256, .75f, true);
   private static final net.minecraft.core.Direction[] faces = net.minecraft.core.Direction.values();
-  private static final ExecutorService workers = Executors.newFixedThreadPool(2, task -> {
-    var thread = new Thread(task, "SpaceBlocks-mesh");
-    thread.setDaemon(true);
-    return thread;
-  });
+  private static final ExecutorService workers =
+      Executors.newFixedThreadPool(
+          2,
+          task -> {
+            var thread = new Thread(task, "SpaceBlocks-mesh");
+            thread.setDaemon(true);
+            return thread;
+          });
+
   private record Job(long epoch) {}
-  private record Built(MeshData[] data, ByteBufferBuilder[] memory,
-      MeshData.SortState translucent) implements AutoCloseable {
+
+  private record Built(MeshData[] data, ByteBufferBuilder[] memory, MeshData.SortState translucent)
+      implements AutoCloseable {
     public void close() {
       for (var mesh : data) if (mesh != null) mesh.close();
       for (var buffer : memory) if (buffer != null) buffer.close();
     }
   }
+
   private static final Map<BlockPos, Job> jobs = new HashMap<>();
   private static final Set<BlockPos> visibleSections = new HashSet<>();
+  private static final Set<BlockPos> normalSections = new HashSet<>(),
+      bottomSections = new HashSet<>();
   private static long epoch;
   private static int inFlight;
   public static int pendingSections;
@@ -64,7 +73,8 @@ public final class PeriodicRenderer {
   private static final Set<BlockPos> dirty = new HashSet<>();
   private static final List<ChunkPos> visibleChunks = new ArrayList<>();
   private static Object world;
-  public static int compiled, drawn;
+  private static boolean lastFallthrough;
+  public static int compiled, drawn, bottomDrawn;
   public static boolean ownBlockEntities;
 
   public static void clear() {
@@ -73,6 +83,8 @@ public final class PeriodicRenderer {
     epoch++;
     jobs.clear();
     visibleSections.clear();
+    normalSections.clear();
+    bottomSections.clear();
     dirty.clear();
     visibleChunks.clear();
     compiled = drawn = 0;
@@ -108,62 +120,89 @@ public final class PeriodicRenderer {
       world = mc.level;
     }
     if (!PlanetClient.active() || mc.player == null) return;
+    if (lastFallthrough != SpaceBlocks.clientSettings.fallthrough) {
+      lastFallthrough = SpaceBlocks.clientSettings.fallthrough;
+      dirty.addAll(meshes.keySet());
+      dirty.addAll(jobs.keySet());
+    }
     var d = PlanetClient.planet();
     var eye = mc.gameRenderer.getMainCamera().getPosition();
     int range = Math.min(mc.options.getEffectiveRenderDistance(), d.size() / 32);
     Set<Long> unique = new HashSet<>();
     visibleChunks.clear();
     visibleSections.clear();
+    normalSections.clear();
+    bottomSections.clear();
     var pending = new ArrayList<BlockPos>();
     var surfaceSections = new HashSet<BlockPos>();
-    boolean aboveSurface = eye.y >= mc.level.getHeight(
-        net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
-        (int) Math.floor(eye.x), (int) Math.floor(eye.z)) - 16;
-    int cx = (int) Math.floor(eye.x) >> 4, cz = (int) Math.floor(eye.z) >> 4;
-    for (int x = -range; x <= range; x++)
-      for (int z = -range; z <= range; z++) {
-        var p = new ChunkPos(d.chunk(cx + x), d.chunk(cz + z));
-        if (!unique.add(p.toLong())) continue;
-        var offset =
-            PeriodicMath.nearest(p.getMinBlockX(), p.getMinBlockZ(), eye.x, eye.z, d.size());
-        if (Math.hypot(p.getMinBlockX() + offset.x() - eye.x, p.getMinBlockZ() + offset.z() - eye.z)
-            > Math.min(d.size() / 4.0, range * 16.0 + 16)) continue;
-        var chunk = mc.level.getChunkSource().getChunk(p.x, p.z, ChunkStatus.FULL, false);
-        if (chunk == null || chunk instanceof EmptyLevelChunk) continue;
-        visibleChunks.add(p);
-        for (int i = 0; i < chunk.getSectionsCount(); i++) {
-          int y = chunk.getSectionYFromSectionIndex(i) * 16;
-          var origin = new BlockPos(p.getMinBlockX(), y, p.getMinBlockZ());
-          if (chunk.getSection(i).hasOnlyAir()) {
-            var old = meshes.remove(origin);
-            if (old != null) for (var b : old.layers) if (b != null) b.close();
-            continue;
+    boolean aboveSurface =
+        eye.y
+            >= mc.level.getHeight(
+                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+                    (int) Math.floor(eye.x),
+                    (int) Math.floor(eye.z))
+                - 16;
+    boolean bottomView = BottomPassage.visible(mc.level, eye.y);
+    for (int pass = 0; pass < (bottomView ? 2 : 1); pass++) {
+      boolean mirrored = pass == 1;
+      var viewEye = mirrored ? BottomPassage.reflect(d, eye) : eye;
+      int cx = (int) Math.floor(viewEye.x) >> 4, cz = (int) Math.floor(viewEye.z) >> 4;
+      unique.clear();
+      for (int x = -range; x <= range; x++)
+        for (int z = -range; z <= range; z++) {
+          var p = new ChunkPos(d.chunk(cx + x), d.chunk(cz + z));
+          if (!unique.add(p.toLong())) continue;
+          var offset =
+              PeriodicMath.nearest(
+                  p.getMinBlockX(), p.getMinBlockZ(), viewEye.x, viewEye.z, d.size());
+          if (Math.hypot(
+                  p.getMinBlockX() + offset.x() - viewEye.x,
+                  p.getMinBlockZ() + offset.z() - viewEye.z)
+              > Math.min(d.size() / 4.0, range * 16.0 + 16)) continue;
+          var chunk = mc.level.getChunkSource().getChunk(p.x, p.z, ChunkStatus.FULL, false);
+          if (chunk == null || chunk instanceof EmptyLevelChunk) continue;
+          if (!mirrored) visibleChunks.add(p);
+          for (int i = 0; i < chunk.getSectionsCount(); i++) {
+            int y = chunk.getSectionYFromSectionIndex(i) * 16;
+            var origin = new BlockPos(p.getMinBlockX(), y, p.getMinBlockZ());
+            if (chunk.getSection(i).hasOnlyAir()) {
+              var old = meshes.remove(origin);
+              if (old != null) for (var b : old.layers) if (b != null) b.close();
+              continue;
+            }
+            if (SpaceBlocks.clientSettings.fallthrough && y + 16 < d.bottom()) continue;
+            // Match the normal vertical view budget instead of compiling the entire 1536-block
+            // column.
+            double ground =
+                chunk.getHeight(
+                        net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8)
+                    + 16;
+            double anchor = Math.min(viewEye.y, ground);
+            // High cameras must keep the ground, even when it is farther below than the view
+            // budget.
+            // Underground, the same window follows the camera rather than the distant surface.
+            if (y + 16 < anchor - range * 16.0 || y > viewEye.y + range * 16.0 + 16) continue;
+            (mirrored ? bottomSections : normalSections).add(origin);
+            boolean first = visibleSections.add(origin);
+            if (!mirrored
+                && aboveSurface
+                && y + 16
+                    >= chunk.getHeight(
+                            net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8)
+                        - 32) surfaceSections.add(origin);
+            if (first
+                && (!meshes.containsKey(origin) || dirty.contains(origin))
+                && !jobs.containsKey(origin)) pending.add(origin);
           }
-          if (SpaceBlocks.clientSettings.fallthrough && y + 16 < d.bottom()) continue;
-          // Match the normal vertical view budget instead of compiling the entire 1536-block column.
-          double ground = chunk.getHeight(
-              net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8) + 16;
-          double anchor = Math.min(eye.y, ground);
-          // High cameras must keep the ground, even when it is farther below than the view budget.
-          // Underground, the same window follows the camera rather than the distant surface.
-          if (y + 16 < anchor - range * 16.0 || y > eye.y + range * 16.0 + 16) continue;
-          visibleSections.add(origin);
-          if (aboveSurface && y + 16 >= chunk.getHeight(
-              net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8) - 32)
-            surfaceSections.add(origin);
-          if ((!meshes.containsKey(origin) || dirty.contains(origin)) && !jobs.containsKey(origin))
-            pending.add(origin);
         }
-      }
+    }
     pending.sort(
         Comparator.<BlockPos>comparingInt(p -> surfaceSections.contains(p) ? 0 : 1)
             .thenComparingDouble(
-            p -> {
-              double dx = PeriodicMath.wrap(p.getX() + 8.5 - eye.x, d.size());
-              double dy = p.getY() + 8.5 - eye.y;
-              double dz = PeriodicMath.wrap(p.getZ() + 8.5 - eye.z, d.size());
-              return dx * dx + dy * dy + dz * dz;
-            }));
+                p -> {
+                  var center = new Vec3(p.getX() + 8.5, p.getY() + 8.5, p.getZ() + 8.5);
+                  return BottomPassage.nearest(mc.level, eye, center).distanceToSqr(eye);
+                }));
     pendingSections = pending.size() + jobs.size();
     var regions = new RenderRegionCache();
     long deadline = System.nanoTime() + 2_000_000;
@@ -176,23 +215,30 @@ public final class PeriodicRenderer {
       dirty.remove(origin);
       inFlight++;
       CompletableFuture.supplyAsync(() -> compile(origin, region), workers)
-          .whenComplete((built, error) -> mc.execute(() -> {
-            inFlight--;
-            jobs.remove(origin, job);
-            if (error != null) {
-              dirty.add(origin);
-              SpaceBlocks.LOGGER.error("Periodic section meshing failed at {}", origin, error);
-              return;
-            }
-            try {
-              if (job.epoch == epoch && visibleSections.contains(origin)) upload(origin, built);
-            } finally { built.close(); }
-          }));
+          .whenComplete(
+              (built, error) ->
+                  mc.execute(
+                      () -> {
+                        inFlight--;
+                        jobs.remove(origin, job);
+                        if (error != null) {
+                          dirty.add(origin);
+                          SpaceBlocks.LOGGER.error(
+                              "Periodic section meshing failed at {}", origin, error);
+                          return;
+                        }
+                        try {
+                          if (job.epoch == epoch && visibleSections.contains(origin))
+                            upload(origin, built);
+                        } finally {
+                          built.close();
+                        }
+                      }));
       if (System.nanoTime() > deadline) break;
     }
     // Never evict a wanted section to admit another wanted section. The old fixed 2048 limit
     // caused perpetual rebuilds and missing terrain with large natural-world view distances.
-    for (var iterator = meshes.entrySet().iterator(); iterator.hasNext();) {
+    for (var iterator = meshes.entrySet().iterator(); iterator.hasNext(); ) {
       var entry = iterator.next();
       if (!visibleSections.contains(entry.getKey())) {
         for (var buffer : entry.getValue().layers) if (buffer != null) buffer.close();
@@ -202,8 +248,13 @@ public final class PeriodicRenderer {
     }
   }
 
-  public static boolean ready(BlockPos origin) { return meshes.containsKey(origin); }
-  public static int cachedSections() { return meshes.size(); }
+  public static boolean ready(BlockPos origin) {
+    return meshes.containsKey(origin);
+  }
+
+  public static int cachedSections() {
+    return meshes.size();
+  }
 
   private static void upload(BlockPos origin, Built built) {
     var result = new VertexBuffer[4];
@@ -237,6 +288,8 @@ public final class PeriodicRenderer {
       var pose = new PoseStack();
       var random = RandomSource.create(0);
       var dispatcher = mc.getBlockRenderer();
+      var planet = PlanetClient.planet();
+      boolean fallthrough = SpaceBlocks.clientSettings.fallthrough;
       var p = new BlockPos.MutableBlockPos();
       var neighbor = new BlockPos.MutableBlockPos();
       net.minecraft.client.renderer.block.ModelBlockRenderer.enableCaching();
@@ -245,8 +298,9 @@ public final class PeriodicRenderer {
           for (int x = 0; x < 16; x++) {
             p.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
             var state = region.getBlockState(p);
+            boolean bottomFace = planet != null && fallthrough && p.getY() == planet.bottom();
             // A fully enclosed opaque cube has no emitted faces. Avoid model/layer/AO work.
-            if (state.getFluidState().isEmpty() && state.isSolidRender(region, p)) {
+            if (!bottomFace && state.getFluidState().isEmpty() && state.isSolidRender(region, p)) {
               boolean enclosed = true;
               for (var face : faces) {
                 neighbor.setWithOffset(p, face);
@@ -299,59 +353,95 @@ public final class PeriodicRenderer {
     var mc = Minecraft.getInstance();
     var d = PlanetClient.planet();
     var eye = mc.gameRenderer.getMainCamera().getPosition();
-    if (layer == 0) drawn = 0;
+    if (layer == 0) {
+      drawn = 0;
+      bottomDrawn = 0;
+    }
     type.setupRenderState();
     shader.getUniform("PlanetRadius").set((float) d.radius());
     shader.getUniform("Eye").set((float) eye.x, (float) eye.y, (float) eye.z);
+    shader.getUniform("BottomY").set((float) d.bottom());
+    int localLight = LevelRenderer.getLightColor(mc.level, BlockPos.containing(eye));
+    shader
+        .getUniform("BottomLight")
+        .set((float) (localLight & 0xffff), (float) ((localLight >>> 16) & 0xffff));
+    shader
+        .getUniform("SourceFloor")
+        .set(SpaceBlocks.clientSettings.fallthrough ? (float) d.bottom() : -100000f);
     try {
-      var ordered = new ArrayList<Mesh>();
-      for (var mesh : meshes.values())
-        if (mesh.layers[layer] != null && visibleSections.contains(mesh.origin)) ordered.add(mesh);
-      if (layer == 3)
-        ordered.sort(
-            Comparator.comparingDouble(
-                (Mesh m) ->
-                    -projectedDistance(
-                        d, eye, m.origin.getX() + 8, m.origin.getY() + 8, m.origin.getZ() + 8)));
-      for (var mesh : ordered) {
-        var p = mesh.origin;
-        if (!visibleSections.contains(p)) continue;
-        var offset = PeriodicMath.nearest(p.getX(), p.getZ(), eye.x, eye.z, d.size());
-        if (Math.hypot(p.getX() + offset.x() - eye.x, p.getZ() + offset.z() - eye.z)
-                > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0)
-            || SpaceBlocks.clientSettings.fallthrough && p.getY() + 16 < d.bottom()) continue;
-        var buffer = mesh.layers[layer];
-        if (buffer == null) continue;
-        shader.CHUNK_OFFSET.set(
-            (float) (p.getX() + offset.x()), (float) p.getY(), (float) (p.getZ() + offset.z()));
-        buffer.bind();
-        if (layer == 3
-            && mesh.translucent != null
-            && (mesh.sortEye == null || d.delta(eye, mesh.sortEye).lengthSqr() > 1)) {
-          try (var memory = new ByteBufferBuilder(32768)) {
-            final double ox = p.getX() + offset.x(), oz = p.getZ() + offset.z();
-            var sorted =
-                mesh.translucent.buildSortedIndexBuffer(
-                    memory,
-                    VertexSorting.byDistance(
-                        v ->
-                            (float) projectedDistance(d, eye, ox + v.x, p.getY() + v.y, oz + v.z)));
-            if (sorted != null) buffer.uploadIndexBuffer(sorted);
+      boolean bottomView = BottomPassage.visible(mc.level, eye.y);
+      for (int pass = 0; pass < (bottomView ? 2 : 1); pass++) {
+        boolean mirrored = pass == 1;
+        var viewEye = mirrored ? BottomPassage.reflect(d, eye) : eye;
+        var sections = mirrored ? bottomSections : normalSections;
+        shader.getUniform("BottomPass").set(mirrored ? 1f : 0f);
+        org.lwjgl.opengl.GL11.glFrontFace(
+            mirrored ? org.lwjgl.opengl.GL11.GL_CW : org.lwjgl.opengl.GL11.GL_CCW);
+        var ordered = new ArrayList<Mesh>();
+        for (var mesh : meshes.values())
+          if (mesh.layers[layer] != null && sections.contains(mesh.origin)) ordered.add(mesh);
+        if (layer == 3)
+          ordered.sort(
+              Comparator.comparingDouble(
+                  (Mesh m) ->
+                      -projectedDistance(
+                          d,
+                          viewEye,
+                          m.origin.getX() + 8,
+                          m.origin.getY() + 8,
+                          m.origin.getZ() + 8,
+                          mirrored)));
+        for (var mesh : ordered) {
+          var p = mesh.origin;
+          if (!visibleSections.contains(p)) continue;
+          var offset = PeriodicMath.nearest(p.getX(), p.getZ(), viewEye.x, viewEye.z, d.size());
+          if (Math.hypot(p.getX() + offset.x() - viewEye.x, p.getZ() + offset.z() - viewEye.z)
+                  > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0)
+              || SpaceBlocks.clientSettings.fallthrough && p.getY() + 16 < d.bottom()) continue;
+          var buffer = mesh.layers[layer];
+          if (buffer == null) continue;
+          shader.CHUNK_OFFSET.set(
+              (float) (p.getX() + offset.x() + (mirrored ? eye.x - viewEye.x : 0)),
+              (float) p.getY(),
+              (float) (p.getZ() + offset.z()));
+          buffer.bind();
+          if (layer == 3
+              && mesh.translucent != null
+              && (mesh.sortEye == null
+                  || mesh.sortMirrored != mirrored
+                  || d.delta(viewEye, mesh.sortEye).lengthSqr() > 1)) {
+            try (var memory = new ByteBufferBuilder(32768)) {
+              final double ox = p.getX() + offset.x(), oz = p.getZ() + offset.z();
+              var sorted =
+                  mesh.translucent.buildSortedIndexBuffer(
+                      memory,
+                      VertexSorting.byDistance(
+                          v ->
+                              (float)
+                                  projectedDistance(
+                                      d, viewEye, ox + v.x, p.getY() + v.y, oz + v.z, mirrored)));
+              if (sorted != null) buffer.uploadIndexBuffer(sorted);
+            }
+            mesh.sortEye = viewEye;
+            mesh.sortMirrored = mirrored;
           }
-          mesh.sortEye = eye;
+          buffer.drawWithShader(view, projection, shader);
+          drawn++;
+          if (mirrored) bottomDrawn++;
         }
-        buffer.drawWithShader(view, projection, shader);
-        drawn++;
       }
     } finally {
+      org.lwjgl.opengl.GL11.glFrontFace(org.lwjgl.opengl.GL11.GL_CCW);
+      shader.getUniform("BottomPass").set(0f);
       VertexBuffer.unbind();
       type.clearRenderState();
     }
   }
 
-  private static double projectedDistance(Planet d, Vec3 eye, double x, double y, double z) {
+  private static double projectedDistance(
+      Planet d, Vec3 eye, double x, double y, double z, boolean mirrored) {
     var flat = d.delta(eye, new Vec3(x, y, z));
-    var q = PeriodicMath.project(flat.x, flat.y, flat.z, d.radius());
+    var q = PeriodicMath.project(flat.x, mirrored ? -flat.y : flat.y, flat.z, d.radius());
     return q.x() * q.x() + q.y() * q.y() + q.z() * q.z();
   }
 
@@ -373,7 +463,8 @@ public final class PeriodicRenderer {
           var pos = be.getBlockPos();
           var offset = PeriodicMath.nearest(pos.getX(), pos.getZ(), eye.x, eye.z, d.size());
           if (Math.hypot(pos.getX() + offset.x() - eye.x, pos.getZ() + offset.z() - eye.z)
-              > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0 + 16)) continue;
+              > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0 + 16))
+            continue;
           var renderer =
               (BlockEntityRenderer<BlockEntity>)
                   mc.getBlockEntityRenderDispatcher().getRenderer(be);

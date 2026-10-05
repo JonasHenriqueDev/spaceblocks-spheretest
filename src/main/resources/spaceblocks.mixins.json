@@ -25,7 +25,8 @@
     "PeriodicLookControlMixin",
     "PeriodicSightMixin",
     "PeriodicPortalMixin",
-    "PeriodicPortalSearchMixin"
+    "PeriodicPortalSearchMixin",
+    "PeriodicBottomCollisionMixin"
   ],
   "client": [
     "client.PeriodicChunkCacheMixin",
@@ -38,7 +39,8 @@
     "client.PeriodicBreakingMixin",
     "client.PeriodicParticlesMixin",
     "client.PeriodicSoundMixin",
-    "client.PeriodicSoundEngineMixin"
+    "client.PeriodicSoundEngineMixin",
+    "client.PeriodicBottomFaceMixin"
   ],
   "injectors": {
     "defaultRequire": 1

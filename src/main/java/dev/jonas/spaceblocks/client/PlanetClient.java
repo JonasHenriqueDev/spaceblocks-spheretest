@@ -43,16 +43,12 @@ public final class PlanetClient {
       var v = direction.scale(Math.min(t, reach));
       var p = PeriodicMath.unproject(v.x, v.y, v.z, d.radius());
       var point = eye.add(p.x(), p.y(), p.z());
-      var block =
-          entity
-              .level()
-              .clip(
-                  new ClipContext(
-                      previous, point, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, entity));
+      var block = clip(entity, previous, point, false);
       double best =
           block.getType() == HitResult.Type.MISS
               ? Double.POSITIVE_INFINITY
-              : block.getLocation().distanceToSqr(previous);
+              : BottomPassage.nearest(entity.level(), eye, block.getLocation())
+                  .distanceToSqr(previous);
       EntityHitResult selected = null;
       for (var target :
           entity
@@ -77,7 +73,8 @@ public final class PlanetClient {
       }
       if (selected != null) return selected;
       if (block.getType() != HitResult.Type.MISS
-          && block.getLocation().distanceToSqr(eye) <= blockReach * blockReach) return block;
+          && BottomPassage.nearest(entity.level(), eye, block.getLocation()).distanceToSqr(eye)
+              <= blockReach * blockReach) return block;
       previous = point;
     }
     return BlockHitResult.miss(
@@ -88,7 +85,8 @@ public final class PlanetClient {
 
   public static Vec3 project(Vec3 world, Vec3 eye) {
     var d = planet();
-    var p = PeriodicMath.project(world.x - eye.x, world.y - eye.y, world.z - eye.z, d.radius());
+    var flat = BottomPassage.nearest(Minecraft.getInstance().level, eye, world).subtract(eye);
+    var p = PeriodicMath.project(flat.x, flat.y, flat.z, d.radius());
     return new Vec3(p.x(), p.y(), p.z());
   }
 
@@ -103,16 +101,7 @@ public final class PlanetClient {
       var point = eye.add(p.x(), p.y(), p.z());
       if (point.distanceToSqr(eye) > reach * reach)
         point = eye.add(point.subtract(eye).normalize().scale(reach));
-      var hit =
-          entity
-              .level()
-              .clip(
-                  new ClipContext(
-                      previous,
-                      point,
-                      ClipContext.Block.OUTLINE,
-                      fluid ? ClipContext.Fluid.ANY : ClipContext.Fluid.NONE,
-                      entity));
+      var hit = clip(entity, previous, point, fluid);
       if (hit.getType() != HitResult.Type.MISS) return hit;
       previous = point;
     }
@@ -120,5 +109,37 @@ public final class PlanetClient {
         previous,
         Direction.getNearest(direction.x, direction.y, direction.z),
         net.minecraft.core.BlockPos.containing(previous));
+  }
+
+  private static BlockHitResult clip(Entity entity, Vec3 from, Vec3 to, boolean fluid) {
+    var level = entity.level();
+    var p = Planet.of(level);
+    var mode = fluid ? ClipContext.Fluid.ANY : ClipContext.Fluid.NONE;
+    if (!BottomPassage.visible(level, entity.getEyeY()) || to.y >= p.bottom())
+      return level.clip(new ClipContext(from, to, ClipContext.Block.OUTLINE, mode, entity));
+    if (from.y >= p.bottom()) {
+      double t = (p.bottom() - from.y) / (to.y - from.y);
+      var seam = from.lerp(to, t);
+      var direct = level.clip(new ClipContext(from, seam, ClipContext.Block.OUTLINE, mode, entity));
+      if (direct.getType() != HitResult.Type.MISS) return direct;
+      from = seam;
+    }
+    var hit =
+        level.clip(
+            new ClipContext(
+                BottomPassage.reflect(p, from),
+                BottomPassage.reflect(p, to),
+                ClipContext.Block.OUTLINE,
+                mode,
+                entity));
+    if (hit.getType() == HitResult.Type.MISS) return hit;
+    var pos = p.canonical(hit.getBlockPos());
+    var location = hit.getLocation();
+    location =
+        new Vec3(
+            PeriodicMath.wrap(location.x, p.size()),
+            location.y,
+            PeriodicMath.wrap(location.z, p.size()));
+    return new BlockHitResult(location, hit.getDirection(), pos, hit.isInside());
   }
 }

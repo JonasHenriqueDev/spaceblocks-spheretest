@@ -1,10 +1,10 @@
-# Space Blocks 0.8.0 — Spheretest
+# Space Blocks 0.8.1 — Spheretest
 
 Minecraft Java **1.21.1**, NeoForge **21.1.255**, **Java 21**. Um mapa plano quadrado finito, com bordas opostas conectadas, desenhado com a projeção exponencial relativa à câmera de **Jeija / Spheretest**. Armazenamento, colisões e gravidade permanecem planos.
 
 ## Jogar
 
-Instale apenas `spaceblocks-0.8.0.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
+Instale apenas `spaceblocks-0.8.1.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
 
 | Comando | Ação |
 | --- | --- |
@@ -61,9 +61,13 @@ No painel, selecione um planeta, informe X/Z e `surface` ou um Y numérico, e us
 
 A 0.8.0 acrescenta o túnel demonstrável: entre no planeta, use `/planet tunnel create`, espere a mensagem `Tunnel ready` e use `/planet tunnel drop`. Ambos os poços ficam livres até abaixo das cinco camadas de bedrock. A queda usa gravidade variável, sem arrasto vertical e sem centrífugo; essas opções são salvas para a dimensão. `/planet surface` sai do poço para a superfície vizinha. Voo, líquidos e elytra conservam suas regras próprias.
 
-Você também pode minerar seu próprio túnel. Ligue `/planet physics fallthrough true`: a bedrock do planeta passa a ser minerável. Abra também a saída correspondente meia volta em X, mantendo Z; a travessia não remove automaticamente pedra do lado oposto. Um poço de apenas um lado pode terminar contra blocos na outra saída. A bedrock do mundo padrão continua inquebrável.
+Você também pode minerar seu próprio túnel. Ligue `/planet physics fallthrough true`: a bedrock do planeta passa a ser minerável. Ao chegar perto do fundo, você vê e seleciona o terreno da saída correspondente meia volta em X, mantendo Z. Pode minerar essa saída a partir do próprio poço, com os pacotes normais de mineração e alcance validado pelo servidor. A passagem espera até haver espaço para o jogador; não o coloca dentro da pedra. Com a opção ligada, as camadas armazenadas abaixo do fundo não formam um piso invisível. A bedrock aceita picareta, mas continua exigindo tempo de mineração em sobrevivência. A bedrock do mundo padrão continua inquebrável.
 
 Esse comportamento reproduz `content_sao.cpp` do Spheretest: deslocamento de meia circunferência em X, reposicionamento no fundo e inversão de velocidade Y. Não precisa de um modo novo de esfera física. A oscilação conserva as limitações desse reposicionamento e da integração por ticks: não há conservação perfeita de energia, polos físicos globais ou núcleo esférico real.
+
+No pequeno, o mapa arredondado por chunks tem 224 blocos e R=32. A ligação usa 112 blocos, enquanto pi×R é cerca de 100,53. Isso produz um desvio visual de cerca de 20,5° em relação a uma esfera ideal. A fórmula e o arredondamento originais foram preservados: a conexão local alinha os túneis, mas não transforma o mapa em uma esfera com polos físicos exatos.
+
+A visão adicional é local ao fundo (16 blocos de distância vertical), sem câmeras recursivas ou outro armazenamento. Ela mostra o terreno comum e suporta sua seleção/mineração; entidades e renderizadores especiais de block entities não recebem uma segunda imagem através dessa passagem.
 
 ## Painel 3D
 
@@ -110,7 +114,7 @@ Não existe compensação de velocidade pelo tamanho visual dos blocos. A gravid
 
 ## Verificação e limites
 
-[Guia de testes](TESTAR-NO-MODRINTH.md) e [resultados](docs/ATLAS-LAB-0.8.0.md) distinguem execução real, testes de matemática, dados salvos e avaliação manual. O JAR é testado como mod empacotado, incluindo cliente integrado e conexão TCP a um servidor dedicado separado.
+[Guia de testes](TESTAR-NO-MODRINTH.md) e [resultados](docs/BOTTOM-PASSAGE-0.8.1.md) distinguem execução real, testes de matemática, dados salvos e avaliação manual. O JAR é testado como mod empacotado, incluindo cliente integrado e conexão TCP a um servidor dedicado separado.
 
 O alcance de chunks limita a porção visível do planeta; não há malha orbital global. Aumentar alcance custa CPU, memória, rede e GPU. Transparência ainda tem os limites de ordenação de polígonos que se intersectam. A validação de IA não cobre individualmente cada mob, ataque especial e goal; a de veículos inclui barco controlado pelo jogador e passageiros no servidor. A validação de redstone inclui transmissão de energia e ticks através da borda, não todas as máquinas possíveis. O teste TCP é local; não mede latência de uma hospedagem na internet. Mods que substituem o renderizador/shaders exigem validação própria e não têm compatibilidade universal garantida.
 
@@ -133,7 +137,7 @@ $env:JAVA_HOME = 'CAMINHO_DO_SEU_JDK_21'
 .\gradlew.bat build
 ```
 
-JAR: `build/libs/spaceblocks-0.8.0.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
+JAR: `build/libs/spaceblocks-0.8.1.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
 
 Créditos: [CREDITS.md](CREDITS.md). Fórmulas, unidades, origem e histórico: [auditoria do Spheretest](docs/SPHERETEST-SOURCES.md). LGPL-2.1-or-later; licença do MDK preservada. Os vídeos são creditados; foram lidos código, histórico e transcrição, sem alegar que os vídeos inacessíveis foram assistidos.
 

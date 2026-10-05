@@ -101,6 +101,39 @@
         1,
         1
       ]
+    },
+    {
+      "name": "BottomPass",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "BottomY",
+      "type": "float",
+      "count": 1,
+      "values": [
+        32
+      ]
+    },
+    {
+      "name": "SourceFloor",
+      "type": "float",
+      "count": 1,
+      "values": [
+        -100000
+      ]
+    },
+    {
+      "name": "BottomLight",
+      "type": "float",
+      "count": 2,
+      "values": [
+        0,
+        0
+      ]
     }
   ]
 }

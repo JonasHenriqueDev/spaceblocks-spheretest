@@ -49,6 +49,11 @@ public final class PlanetServer {
         Math.min(player.requestedViewDistance(), player.server.getPlayerList().getViewDistance());
     int dx = PeriodicMath.wrap(cx - player.chunkPosition().x, d.size() / 16),
         dz = PeriodicMath.wrap(cz - player.chunkPosition().z, d.size() / 16);
+    if (BottomPassage.visible(player.level(), player.getEyeY()))
+      dx =
+          Math.abs(dx) < Math.abs(PeriodicMath.wrap(dx + d.size() / 32, d.size() / 16))
+              ? dx
+              : PeriodicMath.wrap(dx + d.size() / 32, d.size() / 16);
     return Math.abs(dx) <= r
         && Math.abs(dz) <= r
         && SENT.getOrDefault(player, Set.of()).contains(ChunkPos.asLong(d.chunk(cx), d.chunk(cz)));
@@ -64,9 +69,30 @@ public final class PlanetServer {
     Vec3 velocity = e.getDeltaMovement();
     boolean bounce = PlanetSettings.get(e.level()).fallthrough && y < d.bottom();
     if (bounce) {
-      y = d.bottom() + 1;
-      x = PeriodicMath.wrap(x + d.size() / 2.0, d.size());
-      velocity = new Vec3(velocity.x, -velocity.y, velocity.z);
+      double destinationX = PeriodicMath.wrap(x + d.size() / 2.0, d.size());
+      double destinationY = d.bottom() + 1;
+      if (e instanceof ServerPlayer player) {
+        player
+            .serverLevel()
+            .getChunk((int) Math.floor(destinationX) >> 4, (int) Math.floor(z) >> 4);
+      }
+      // Do not place a player inside the still-solid exit. The local bottom view lets them mine it.
+      boolean clear =
+          !(e instanceof ServerPlayer)
+              || e.level()
+                  .noCollision(
+                      e,
+                      e.getBoundingBox()
+                          .move(destinationX - e.getX(), destinationY - e.getY(), z - e.getZ()));
+      if (clear) {
+        y = destinationY;
+        x = destinationX;
+        velocity = new Vec3(velocity.x, -velocity.y, velocity.z);
+      } else {
+        y = d.bottom() + .001;
+        velocity = new Vec3(velocity.x, 0, velocity.z);
+        bounce = false;
+      }
       e.fallDistance = 0;
     }
     if (x == e.getX() && z == e.getZ() && y == e.getY()) return;
@@ -139,6 +165,12 @@ public final class PlanetServer {
         for (int dx = -range; dx <= range; dx++)
           for (int dz = -range; dz <= range; dz++)
             near.add(ChunkPos.asLong(d.chunk(cx + dx), d.chunk(cz + dz)));
+        if (BottomPassage.visible(level, player.getEyeY())) {
+          int opposite = (int) Math.floor(player.getX() + d.size() / 2.0) >> 4;
+          for (int dx = -range; dx <= range; dx++)
+            for (int dz = -range; dz <= range; dz++)
+              near.add(ChunkPos.asLong(d.chunk(opposite + dx), d.chunk(cz + dz)));
+        }
         wanted.addAll(near);
         var sent = SENT.computeIfAbsent(player, k -> new HashSet<>());
         for (long key : new HashSet<>(sent))
@@ -152,10 +184,20 @@ public final class PlanetServer {
             Comparator.comparingDouble(
                 key -> {
                   var c = new ChunkPos(key);
-                  return d.delta(
-                          player.position(),
-                          new Vec3(c.getMinBlockX() + 8, player.getY(), c.getMinBlockZ() + 8))
-                      .lengthSqr();
+                  double direct =
+                      d.delta(
+                              player.position(),
+                              new Vec3(c.getMinBlockX() + 8, player.getY(), c.getMinBlockZ() + 8))
+                          .lengthSqr();
+                  if (!BottomPassage.visible(level, player.getEyeY())) return direct;
+                  var other =
+                      new Vec3(player.getX() + d.size() / 2.0, player.getY(), player.getZ());
+                  return Math.min(
+                      direct,
+                      d.delta(
+                              other,
+                              new Vec3(c.getMinBlockX() + 8, player.getY(), c.getMinBlockZ() + 8))
+                          .lengthSqr());
                 }));
         int budget = 6;
         for (long key : queue) {
@@ -177,7 +219,7 @@ public final class PlanetServer {
           if (--budget == 0) break;
         }
       }
-      for (var iterator = active.iterator(); iterator.hasNext();) {
+      for (var iterator = active.iterator(); iterator.hasNext(); ) {
         long key = iterator.next();
         if (!wanted.contains(key)) {
           var c = new ChunkPos(key);
