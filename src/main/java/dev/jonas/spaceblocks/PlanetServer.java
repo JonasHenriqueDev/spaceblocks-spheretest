@@ -18,9 +18,42 @@ public final class PlanetServer {
   private static final Map<ServerPlayer, Set<Long>> SENT = new WeakHashMap<>();
   private static final Map<ServerLevel, Set<Long>> TICKETS = new WeakHashMap<>();
   private static final Map<ServerLevel, Set<BlockPos>> CHANGED = new WeakHashMap<>();
+  private static final Map<ServerPlayer, ViewLease> BOTTOM_VIEW = new WeakHashMap<>();
+
+  private record ViewLease(int expires, boolean projection) {}
+
+  public static void bottomView(ServerPlayer player, boolean visible, boolean projection) {
+    int range =
+        Math.min(player.requestedViewDistance(), player.server.getPlayerList().getViewDistance());
+    if (!visible
+        || !BottomView.looking(
+            player.level(),
+            player,
+            player.getEyePosition(),
+            player.getViewVector(1),
+            range,
+            projection)) {
+      BOTTOM_VIEW.remove(player);
+      return;
+    }
+    BOTTOM_VIEW.put(player, new ViewLease(player.server.getTickCount() + 30, projection));
+  }
+
+  /** Visual area only while looking; a 3x3 safety area immediately before physical passage. */
+  public static int bottomRange(ServerPlayer player) {
+    var p = Planet.of(player.level());
+    if (p == null || !PlanetSettings.get(player.level()).fallthrough) return -1;
+    if (BOTTOM_VIEW.containsKey(player)
+        && BOTTOM_VIEW.get(player).expires >= player.server.getTickCount())
+      return Math.min(
+          Math.min(player.requestedViewDistance(), player.server.getPlayerList().getViewDistance()),
+          p.size() / 32);
+    return Math.abs(player.getY() - p.bottom()) <= 4 ? 1 : -1;
+  }
 
   public static void reset(ServerPlayer player) {
     SENT.remove(player);
+    BOTTOM_VIEW.remove(player);
   }
 
   public static void dimensionChanged(
@@ -35,6 +68,7 @@ public final class PlanetServer {
     SENT.clear();
     TICKETS.clear();
     CHANGED.clear();
+    BOTTOM_VIEW.clear();
   }
 
   public static void changed(ServerLevel level, BlockPos p) {
@@ -49,7 +83,7 @@ public final class PlanetServer {
         Math.min(player.requestedViewDistance(), player.server.getPlayerList().getViewDistance());
     int dx = PeriodicMath.wrap(cx - player.chunkPosition().x, d.size() / 16),
         dz = PeriodicMath.wrap(cz - player.chunkPosition().z, d.size() / 16);
-    if (BottomPassage.visible(player.level(), player.getEyeY()))
+    if (bottomRange(player) >= 0)
       dx =
           Math.abs(dx) < Math.abs(PeriodicMath.wrap(dx + d.size() / 32, d.size() / 16))
               ? dx
@@ -154,6 +188,19 @@ public final class PlanetServer {
       int requests = 4;
       for (var player : level.players()) {
         wrap(player);
+        if (player.tickCount % 5 == 0 && BOTTOM_VIEW.containsKey(player)) {
+          int viewRange =
+              Math.min(
+                  player.requestedViewDistance(), player.server.getPlayerList().getViewDistance());
+          if (BOTTOM_VIEW.get(player).expires < player.server.getTickCount()
+              || !BottomView.looking(
+                  level,
+                  player,
+                  player.getEyePosition(),
+                  player.getViewVector(1),
+                  viewRange,
+                  BOTTOM_VIEW.get(player).projection)) BOTTOM_VIEW.remove(player);
+        }
         if (player.tickCount % 20 == 0) PlanetNetwork.sync(player);
         int range =
             Math.min(
@@ -165,10 +212,11 @@ public final class PlanetServer {
         for (int dx = -range; dx <= range; dx++)
           for (int dz = -range; dz <= range; dz++)
             near.add(ChunkPos.asLong(d.chunk(cx + dx), d.chunk(cz + dz)));
-        if (BottomPassage.visible(level, player.getEyeY())) {
+        int bottomRange = bottomRange(player);
+        if (bottomRange >= 0) {
           int opposite = (int) Math.floor(player.getX() + d.size() / 2.0) >> 4;
-          for (int dx = -range; dx <= range; dx++)
-            for (int dz = -range; dz <= range; dz++)
+          for (int dx = -bottomRange; dx <= bottomRange; dx++)
+            for (int dz = -bottomRange; dz <= bottomRange; dz++)
               near.add(ChunkPos.asLong(d.chunk(opposite + dx), d.chunk(cz + dz)));
         }
         wanted.addAll(near);
@@ -176,7 +224,7 @@ public final class PlanetServer {
         for (long key : new HashSet<>(sent))
           if (!near.contains(key)) {
             var c = new ChunkPos(key);
-            player.connection.send(new ClientboundForgetLevelChunkPacket(c));
+            PacketDistributor.sendToPlayer(player, new PlanetNetwork.ForgetChunk(c.x, c.z));
             sent.remove(key);
           }
         var queue = new ArrayList<>(near);
@@ -189,7 +237,7 @@ public final class PlanetServer {
                               player.position(),
                               new Vec3(c.getMinBlockX() + 8, player.getY(), c.getMinBlockZ() + 8))
                           .lengthSqr();
-                  if (!BottomPassage.visible(level, player.getEyeY())) return direct;
+                  if (bottomRange < 0) return direct;
                   var other =
                       new Vec3(player.getX() + d.size() / 2.0, player.getY(), player.getZ());
                   return Math.min(
@@ -243,5 +291,6 @@ public final class PlanetServer {
             }
     }
     SENT.keySet().removeIf(p -> Planet.of(p.level()) == null || p.hasDisconnected());
+    BOTTOM_VIEW.keySet().removeIf(p -> Planet.of(p.level()) == null || p.hasDisconnected());
   }
 }

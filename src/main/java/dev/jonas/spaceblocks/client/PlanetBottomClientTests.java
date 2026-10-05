@@ -55,7 +55,7 @@ public final class PlanetBottomClientTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.2.jar"),
+                .contains("spaceblocks-0.8.3.jar"),
             "Final packaged bottom-passage JAR loaded");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);
@@ -295,11 +295,157 @@ public final class PlanetBottomClientTests {
             });
       }
       if (ticks == 1120) {
+        server(
+            p -> {
+              var level = p.serverLevel();
+              var planet = Planet.of(level);
+              int b = planet.bottom();
+              var settings = PlanetSettings.get(level);
+              settings.fallthrough = true;
+              settings.setDirty();
+              PlanetNetwork.sync(p);
+              for (int cx : new int[] {40, -776})
+                for (int y = b; y <= b + 96; y++)
+                  for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++)
+                      level.setBlock(
+                          new BlockPos(cx + dx, y, 30 + dz),
+                          (Math.abs(dx) == 2 || Math.abs(dz) == 2)
+                              ? (y % 8 == 0 ? Blocks.GLOWSTONE : Blocks.GLASS).defaultBlockState()
+                              : Blocks.AIR.defaultBlockState(),
+                          3);
+              p.connection.teleport(40.5, b + 48, 30.5, 0, 90);
+              p.getAbilities().mayfly = true;
+              p.getAbilities().flying = true;
+              p.onUpdateAbilities();
+              p.setDeltaMovement(Vec3.ZERO);
+              p.connection.send(
+                  new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(p));
+              PlanetServer.reset(p);
+            });
+      }
+      if (ticks == 1250) {
+        check(
+            !BottomPassage.visible(mc.level, mc.player.getEyeY()),
+            "Far viewer is outside the old 16-block interaction window (Y="
+                + mc.player.getY()
+                + ", flying="
+                + mc.player.getAbilities().flying
+                + ")");
+        check(
+            BottomViewClient.active() && PeriodicRenderer.bottomDrawn > 0,
+            "Render-distance view actually draws the exit 48 blocks above bottom");
+        net.minecraft.client.Screenshot.grab(
+            mc.gameDirectory, "bottom-distance-open.png", mc.getMainRenderTarget(), m -> {});
+        server(
+            p -> {
+              check(
+                  PlanetServer.bottomRange(p) > 1,
+                  "Server grants extended streaming only for visible shaft");
+              p.connection.teleport(40.5, Planet.of(p.level()).bottom() + 48, 30.5, 0, -90);
+              p.setDeltaMovement(Vec3.ZERO);
+            });
+      }
+      if (ticks == 1320) {
+        check(
+            !BottomViewClient.active() && PeriodicRenderer.bottomDrawn == 0,
+            "Looking up stops opposite terrain draw");
+        check(
+            mc.level.getChunkSource().getChunkNow(-776 >> 4, 30 >> 4) == null,
+            "Looking away unloads the remote source chunk");
+        server(
+            p -> {
+              check(
+                  PlanetServer.bottomRange(p) == -1,
+                  "Looking away releases extended streaming lease");
+              int b = Planet.of(p.level()).bottom();
+              for (int dx = -2; dx <= 2; dx++)
+                for (int dz = -2; dz <= 2; dz++)
+                  p.level()
+                      .setBlock(
+                          new BlockPos(40 + dx, b + 44, 30 + dz),
+                          Blocks.STONE.defaultBlockState(),
+                          3);
+              p.connection.teleport(40.5, b + 48, 30.5, 0, 90);
+              p.setDeltaMovement(Vec3.ZERO);
+            });
+      }
+      if (ticks == 1400) {
+        check(
+            !BottomViewClient.active(),
+            "Solid cap occludes the shaft and prevents visual activation");
+        server(
+            p -> {
+              check(
+                  PlanetServer.bottomRange(p) == -1,
+                  "Occluded shaft does not retain opposite streaming");
+              int b = Planet.of(p.level()).bottom();
+              for (int dx = -2; dx <= 2; dx++)
+                for (int dz = -2; dz <= 2; dz++)
+                  p.level()
+                      .setBlock(
+                          new BlockPos(40 + dx, b + 44, 30 + dz),
+                          Blocks.AIR.defaultBlockState(),
+                          3);
+            });
+        mc.options.renderDistance().set(2);
+        mc.options.broadcastOptions();
+      }
+      if (ticks == 1450) {
+        check(
+            !BottomViewClient.active(),
+            "Two-chunk view budget rejects the 48-block-deep connection");
+        mc.options.renderDistance().set(6);
+        mc.options.broadcastOptions();
+      }
+      if (ticks == 1550) {
+        check(
+            BottomViewClient.active() && PeriodicRenderer.bottomDrawn > 0,
+            "Increasing render distance restores the opposite view");
+        server(p -> p.server.saveEverything(false, true, true));
+      }
+      if (ticks == 1580) {
+        check(
+            net.neoforged.neoforge.client.ClientCommandHandler.runCommand("planet shader false")
+                && !PlanetProjection.enabled,
+            "Local shader command disables only world projection");
+        var flat =
+            PlanetClient.project(
+                mc.player.getEyePosition().add(3, 2, 1), mc.player.getEyePosition());
+        check(
+            flat.distanceTo(new Vec3(3, 2, 1)) < 1e-9,
+            "Flat diagnostic projection keeps vertex coordinates and selection consistent");
+      }
+      if (ticks == 1610) {
+        check(
+            PlanetShaders.shader(0).getUniform("ProjectionEnabled").getFloatBuffer().get(0) == 0,
+            "Packaged GPU terrain shader is actually bypassing curvature");
+        check(
+            BottomViewClient.active() && PeriodicRenderer.bottomDrawn > 0,
+            "Bottom view remains available with the curvature shader disabled");
+        net.minecraft.client.Screenshot.grab(
+            mc.gameDirectory, "bottom-flat-shader-off.png", mc.getMainRenderTarget(), m -> {});
+        server(
+            p ->
+                check(
+                    PlanetSettings.get(p.level()).fallthrough,
+                    "Shader toggle does not disable bottom physics"));
+        net.neoforged.neoforge.client.ClientCommandHandler.runCommand("planet shader true");
+      }
+      if (ticks == 1640) {
+        check(
+            PlanetProjection.enabled
+                && PlanetShaders.shader(0).getUniform("ProjectionEnabled").getFloatBuffer().get(0)
+                    == 1,
+            "Shader command restores the curved world");
+      }
+      if (ticks == 1660) {
         Files.write(mc.gameDirectory.toPath().resolve("bottom-client-results.txt"), results);
         SpaceBlocks.LOGGER.info("BOTTOM_CLIENT_TEST_PASS");
         done = true;
         mc.stop();
       }
+      if (ticks >= 1130 && ticks < 1660) mc.player.setDeltaMovement(Vec3.ZERO);
     } catch (Throwable failure) {
       SpaceBlocks.LOGGER.error("BOTTOM_CLIENT_TEST_FAIL", failure);
       try {

@@ -129,7 +129,7 @@ public final class PlanetClientTests {
                   .getCodeSource()
                   .getLocation()
                   .toString()
-                  .contains("spaceblocks-0.8.2.jar"),
+                  .contains("spaceblocks-0.8.3.jar"),
               "Loaded final packaged JAR, not development classes");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);

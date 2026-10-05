@@ -28,7 +28,7 @@ public final class PlanetTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.2.jar"),
+                .contains("spaceblocks-0.8.3.jar"),
             "Final packaged JAR is the loaded mod");
       for (var key : List.of(SpaceBlocks.SMALL, SpaceBlocks.LARGE)) {
         var level = e.getServer().getLevel(key);

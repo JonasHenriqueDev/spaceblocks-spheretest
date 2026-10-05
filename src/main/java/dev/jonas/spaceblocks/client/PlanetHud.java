@@ -56,6 +56,36 @@ public final class PlanetHud {
         .register(
             Commands.literal("planet")
                 .then(
+                    Commands.literal("shader")
+                        .executes(
+                            c -> {
+                              Minecraft.getInstance()
+                                  .player
+                                  .sendSystemMessage(
+                                      net.minecraft.network.chat.Component.literal(
+                                          "Planet projection shader=" + PlanetProjection.enabled));
+                              return 1;
+                            })
+                        .then(
+                            Commands.argument(
+                                    "enabled",
+                                    com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(
+                                    c -> {
+                                      PlanetProjection.enabled =
+                                          com.mojang.brigadier.arguments.BoolArgumentType.getBool(
+                                              c, "enabled");
+                                      BottomViewClient.refresh();
+                                      Minecraft.getInstance()
+                                          .player
+                                          .sendSystemMessage(
+                                              net.minecraft.network.chat.Component.literal(
+                                                  "Planet projection shader="
+                                                      + PlanetProjection.enabled
+                                                      + ". Periodic world and physics unchanged."));
+                                      return 1;
+                                    })))
+                .then(
                     Commands.literal("hud")
                         .executes(
                             c -> {

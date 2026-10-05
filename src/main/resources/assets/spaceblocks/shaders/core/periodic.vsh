@@ -13,6 +13,7 @@ uniform mat4 ProjMat;
 uniform vec3 ChunkOffset;
 uniform vec3 Eye;
 uniform float PlanetRadius;
+uniform float ProjectionEnabled;
 uniform float BottomPass;
 uniform float BottomY;
 uniform vec2 BottomLight;
@@ -30,6 +31,7 @@ void main() {
     float radial = PlanetRadius * exp(planar.y / PlanetRadius);
     float factor = distance < 0.000001 ? exp(planar.y / PlanetRadius) : radial * sin(angle) / distance;
     vec3 pos = vec3(planar.x * factor, radial * cos(angle) - PlanetRadius, planar.z * factor);
+    if (ProjectionEnabled < 0.5) pos = planar;
     gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
     vertexDistance = length(pos);
     ivec2 light = UV2;

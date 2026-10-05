@@ -127,6 +127,7 @@ public final class PeriodicRenderer {
     }
     var d = PlanetClient.planet();
     var eye = mc.gameRenderer.getMainCamera().getPosition();
+    BottomViewClient.update();
     int range = Math.min(mc.options.getEffectiveRenderDistance(), d.size() / 32);
     Set<Long> unique = new HashSet<>();
     visibleChunks.clear();
@@ -142,7 +143,7 @@ public final class PeriodicRenderer {
                     (int) Math.floor(eye.x),
                     (int) Math.floor(eye.z))
                 - 16;
-    boolean bottomView = BottomPassage.visible(mc.level, eye.y);
+    boolean bottomView = BottomViewClient.active();
     for (int pass = 0; pass < (bottomView ? 2 : 1); pass++) {
       boolean mirrored = pass == 1;
       var viewEye = mirrored ? BottomPassage.reflect(d, eye) : eye;
@@ -201,7 +202,10 @@ public final class PeriodicRenderer {
             .thenComparingDouble(
                 p -> {
                   var center = new Vec3(p.getX() + 8.5, p.getY() + 8.5, p.getZ() + 8.5);
-                  return BottomPassage.nearest(mc.level, eye, center).distanceToSqr(eye);
+                  double direct = d.delta(eye, center).lengthSqr();
+                  return bottomView
+                      ? Math.min(direct, d.delta(eye, BottomPassage.reflect(d, center)).lengthSqr())
+                      : direct;
                 }));
     pendingSections = pending.size() + jobs.size();
     var regions = new RenderRegionCache();
@@ -359,6 +363,7 @@ public final class PeriodicRenderer {
     }
     type.setupRenderState();
     shader.getUniform("PlanetRadius").set((float) d.projectionRadius());
+    shader.getUniform("ProjectionEnabled").set(PlanetProjection.enabled ? 1f : 0f);
     shader.getUniform("Eye").set((float) eye.x, (float) eye.y, (float) eye.z);
     shader.getUniform("BottomY").set((float) d.bottom());
     int localLight = LevelRenderer.getLightColor(mc.level, BlockPos.containing(eye));
@@ -369,7 +374,7 @@ public final class PeriodicRenderer {
         .getUniform("SourceFloor")
         .set(SpaceBlocks.clientSettings.fallthrough ? (float) d.bottom() : -100000f);
     try {
-      boolean bottomView = BottomPassage.visible(mc.level, eye.y);
+      boolean bottomView = BottomViewClient.active();
       for (int pass = 0; pass < (bottomView ? 2 : 1); pass++) {
         boolean mirrored = pass == 1;
         var viewEye = mirrored ? BottomPassage.reflect(d, eye) : eye;
@@ -441,7 +446,8 @@ public final class PeriodicRenderer {
   private static double projectedDistance(
       Planet d, Vec3 eye, double x, double y, double z, boolean mirrored) {
     var flat = d.delta(eye, new Vec3(x, y, z));
-    var q = PeriodicMath.project(flat.x, mirrored ? -flat.y : flat.y, flat.z, d.projectionRadius());
+    var q =
+        PlanetProjection.project(flat.x, mirrored ? -flat.y : flat.y, flat.z, d.projectionRadius());
     return q.x() * q.x() + q.y() * q.y() + q.z() * q.z();
   }
 

@@ -8,6 +8,37 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class PlanetNetwork {
+  public record ForgetChunk(int x, int z) implements CustomPacketPayload {
+    public static final Type<ForgetChunk> TYPE = new Type<>(SpaceBlocks.id("forget_chunk"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, ForgetChunk> CODEC =
+        StreamCodec.of(
+            (b, p) -> {
+              b.writeInt(p.x);
+              b.writeInt(p.z);
+            },
+            b -> new ForgetChunk(b.readInt(), b.readInt()));
+
+    public Type<ForgetChunk> type() {
+      return TYPE;
+    }
+  }
+
+  public record BottomViewRequest(boolean visible, boolean projection)
+      implements CustomPacketPayload {
+    public static final Type<BottomViewRequest> TYPE = new Type<>(SpaceBlocks.id("bottom_view"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, BottomViewRequest> CODEC =
+        StreamCodec.of(
+            (b, p) -> {
+              b.writeBoolean(p.visible);
+              b.writeBoolean(p.projection);
+            },
+            b -> new BottomViewRequest(b.readBoolean(), b.readBoolean()));
+
+    public Type<BottomViewRequest> type() {
+      return TYPE;
+    }
+  }
+
   public record Options(
       String dimension,
       int radius,
@@ -80,7 +111,18 @@ public final class PlanetNetwork {
   }
 
   public static void register(RegisterPayloadHandlersEvent event) {
-    var r = event.registrar("8.2");
+    var r = event.registrar("8.3");
+    r.playToClient(
+        ForgetChunk.TYPE,
+        ForgetChunk.CODEC,
+        (p, c) -> dev.jonas.spaceblocks.client.BottomViewClient.forget(p));
+    r.playToServer(
+        BottomViewRequest.TYPE,
+        BottomViewRequest.CODEC,
+        (p, c) -> {
+          if (c.player() instanceof ServerPlayer player)
+            PlanetServer.bottomView(player, p.visible, p.projection);
+        });
     PlanetManagerNetwork.register(r);
     r.playToServer(
         PlanetAtlas.Request.TYPE,

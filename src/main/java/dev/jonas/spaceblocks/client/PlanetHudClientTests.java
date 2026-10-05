@@ -69,8 +69,8 @@ public final class PlanetHudClientTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.2.jar"),
-            "Packaged 0.8.2 loaded");
+                .contains("spaceblocks-0.8.3.jar"),
+            "Packaged 0.8.3 loaded");
         mc.options.pauseOnLostFocus = false;
         mc.getTutorial().setStep(net.minecraft.client.tutorial.TutorialSteps.NONE);
         mc.options.renderDistance().set(5);

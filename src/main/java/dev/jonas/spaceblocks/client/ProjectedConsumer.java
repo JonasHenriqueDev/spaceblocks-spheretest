@@ -41,7 +41,7 @@ public final class ProjectedConsumer implements VertexConsumer {
               .subtract(eye);
       flat.set((float) nearby.x, (float) nearby.y, (float) nearby.z);
     }
-    var p = PeriodicMath.project(flat.x, flat.y, flat.z, radius);
+    var p = PlanetProjection.project(flat.x, flat.y, flat.z, radius);
     var transformed =
         view.transformPosition(new Vector3f((float) p.x(), (float) p.y(), (float) p.z()));
     target.addVertex(transformed.x, transformed.y, transformed.z);
