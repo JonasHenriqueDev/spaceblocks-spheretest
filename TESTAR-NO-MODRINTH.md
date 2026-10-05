@@ -1,59 +1,45 @@
-# Space Blocks 0.5.0 — teste no Modrinth
+# Testar Space Blocks 0.6.0 no Modrinth App
 
-Minecraft Java 1.21.1 + NeoForge 21.1.255. Não é preciso instalar Immersive Portals.
-O renderizador foi escrito para este projeto e os créditos estão em CREDITS.md.
+Minecraft Java 1.21.1 + NeoForge 21.1.255 + Java 21. Instância: `NeoForge 1.21.1`.
 
-## Comandos (em inglês)
+## Instalação e recuperação
 
-- `/planet` ou `/planet normal`: novo planeta grande com relevo, faces de 1.024 blocos.
-- `/planet colors`: planeta grande plano com seis cores para conferir as bordas.
-- `/planet small`: planeta plano de faces de 64 blocos para testes rápidos.
-- `/planet flat`: planeta grande plano anterior, preservando as construções.
-- `/planet view`: observar a esfera de longe.
-- `/planet surface`: retornar a chão seguro próximo.
-- `/planet fly` e `/planet walk`: alternar voo livre e caminhada.
-- `/planet info`: conferir face, tamanho e altitude.
-- `/planet leave`: voltar ao ponto original.
+O JAR 0.6.0 foi instalado na pasta `mods` da instância, com hash conferido contra o artefato testado. Ele é o único `spaceblocks-*.jar` nessa pasta; o 0.5.0 foi movido para o backup externo. Crie um mundo novo com comandos habilitados. Mundos anteriores à 0.6.0 não devem ser usados para testar a topologia nova.
 
-Abra a instância `NeoForge 1.21.1` no Modrinth e um mundo com comandos habilitados.
-WASD para andar, Espaço para pular e Ctrl para correr. Em voo, Espaço sobe e
-Shift desce. O planeta novo tem volta equatorial aproximada de 4.096 blocos.
+A recuperação 0.5.0 está na tag Git `recovery-0.5.0`. O backup completo local é `C:\Dev\minecraft-space-mod-backup-0.5.0-20261005`: projeto, JAR antigo e saves originais. Para restaurar, feche o jogo, retire o JAR 0.6.0, copie o JAR 0.5.0 desse backup para `mods` e restaure o save correspondente se necessário. Não misture os dois JARs. O backup local não foi publicado.
 
-## O que conferir
+## Roteiro no planeta pequeno
 
-1. No planeta colorido, construa uma torre próxima da borda e observe-a da face vizinha antes de atravessar.
-2. Caminhe pela borda observando a torre e faça alterações para verificar a atualização da imagem.
-3. No planeta pequeno, dê uma volta completa e passe pelos cantos.
-4. Use `/planet` para conhecer as colinas e vales do novo planeta grande.
-5. Cave para baixo e use `/planet surface` para retornar. O crash de malha vazia permanece corrigido.
-6. Use `/planet view`: construções acima do terreno aparecem em representação simplificada à distância.
+1. `/planet small`, `/planet info`. O intervalo é [-112,112) em X e Z. Anote a posição; caminhe através de X=112, X=-112, Z=112 e Z=-112. Depois atravesse um canto na diagonal. WASD, yaw e pitch devem manter sua direção.
+2. Faça uma volta completa em X e outra em Z. Volte à posição anotada sem mudança de altura do terreno. As voltas automáticas incluem as duas direções de cada eixo; a percepção do movimento continua sendo uma verificação manual útil.
+3. Construa entre X=110,111 e a representação X=112,113, que corresponde a X=-112,-111. Coloque e remova blocos dos dois lados; confira o mesmo inventário de um baú pelo lado conectado. Repita em Z e no canto.
+4. Construa torres e coloque TNT em Y=81,96,112. Compare o formato ao mudar a altura da câmera com `/planet fly`. A correção é a exponencial do corte vertical; não espere que toda perspectiva tridimensional seja idêntica à de um cubo em uma esfera física.
+5. Abra túneis perto das bordas e cave para baixo. O fundo é Y=32. `/planet physics fallthrough false` permite observar a queda sem a mudança de lado; ligue de novo antes do teste de travessia. Abra também um corredor de saída no lado oposto para evitar emergir dentro de pedra.
+6. `/planet physics realistic_gravity true`; compare saltos e queda em altitudes diferentes. Teste `centrifugal true` e `false` durante deslocamento horizontal. Não há ajuste da velocidade pelo tamanho visual dos blocos.
+7. Confira seleção de blocos, porcos, itens caídos, TNT acesa, água, baús e mão em primeira pessoa, inclusive perto de uma borda. A mão deve continuar normal; objetos do mundo devem acompanhar o terreno.
+8. `/planet leave`. Confira posição e habilidades de voo no mundo de origem.
 
-Faces do planeta colorido: Frente verde; Direita azul; Verso roxo; Esquerda
-amarela; Norte branco; Sul vermelho. O HUD identifica a face.
+## Planeta maior e salvamento
 
-## Saves e limites
+`/planet large` usa [-816,816) em X/Z, fundo Y=-192. Repita construção e mineração profunda, suba/desça com voo e ajuste a distância de renderização à sua máquina. Salve, feche o Minecraft e reabra; confirme construções, inventários, blocos minerados e opções de física. Guarde um screenshot da posição antes/depois para comparar.
 
-O planeta com relevo é uma dimensão nova. Os planetas anteriores e seus blocos
-continuam preservados; `/planet flat`, `/space radial` e `/space legacy`
-permitem revisitá-los. Um jogador salvo no planeta antigo continua nele até
-usar um comando para mudar de planeta.
+## Harnesses isolados no projeto
 
-- As seis faces usam vistas de passagens invisíveis e blocos de origem reais.
-- O carregamento antecipado tem orçamento; avançar para áreas inéditas pode exigir alguns segundos para completar a vista.
-- O solo inicial é uma camada de cerca de 25 blocos; ainda não há interior, cavernas, vegetação ou biomas elaborados.
-- A correção suave dos cantos é visual, com gravidade normal.
-- A vista orbital usa cubos texturizados para construções; formas especiais e transparência ficam simplificadas. A malha orbital não mostra buracos da mineração.
-- Entidades remotas, líquidos, áudio, redstone e multiplayer ainda precisam de implementação ou validação adicional.
-- Baús e outros blocos com entidades de bloco continuam bloqueados nesta dimensão enquanto inventários compartilhados não estiverem prontos.
-- Artefatos em cantos, transparência e compatibilidade com outros renderizadores ainda precisam de testes de uso. Esta versão é experimental.
+Os testes de unidade rodam com `gradlew build`. Os clientes automáticos usam teclado simulado pelo próprio Minecraft, ray picking real, pacotes de mineração/construção, capturas pelo Minecraft e um servidor integrado. Não controlam outra sessão do usuário.
 
-## Desenvolvimento
+Os runs `periodicServer` e `periodicClient` usam `run-periodic`. Os runs `packagedPeriodicServer` e `packagedPeriodicClient` usam `loadedMods=[]` e verificam que a origem da classe do mod é o JAR final em `run-periodic/mods/spaceblocks-0.6.0.jar`. O mundo isolado se chama `PeriodicTest`: o servidor dedicado usa `run-periodic/PeriodicTest`; para o cliente copie esse mundo fechado para `run-periodic/saves/PeriodicTest`.
 
-Projeto: `C:/Dev/minecraft-space-mod`. JAR: `build/libs/spaceblocks-0.5.0.jar`.
+Prepare `eula.txt` conforme sua aceitação do EULA, `server.properties` com mundo plano, modo criativo, `online-mode=false`, `server-ip=127.0.0.1`, porta livre e alcance 4 ou 5. Isso serve somente ao teste local. O cliente aceita automaticamente as telas de início/aviso apenas com a propriedade de teste ativada.
 
-`./gradlew.bat build` compila e executa os testes unitários.
-`runPackagedPortalClient` testa construção remota, alteração ao vivo, passagem,
-LOD orbital e planeta com relevo. `runPackagedFlatClient` testa 24 bordas, volta
-completa e oito cantos; `runPackagedDigClient` testa mineração. Esses clientes
-usam o JAR em `run-smoke/mods`, sem carregar o mod pelas fontes, e um save de
-desenvolvimento separado. Os testes só são ativados por propriedades JVM.
+```powershell
+.\gradlew.bat runPeriodicServer
+.\gradlew.bat runPeriodicClient
+.\gradlew.bat build
+Copy-Item build/libs/spaceblocks-0.6.0.jar run-periodic/mods/spaceblocks-0.6.0.jar
+.\gradlew.bat runPackagedPeriodicServer
+.\gradlew.bat runPackagedPeriodicClient
+```
+
+Confira os arquivos `periodic-server-results.txt` e `periodic-client-results.txt` dentro de `run-periodic`, além dos marcadores `PERIODIC_SERVER_TEST_PASS` / `PERIODIC_CLIENT_TEST_PASS` no console. **O exit code do jogo isoladamente não comprova aprovação do harness**: uma falha controlada também pode fechar o jogo normalmente. Rode o servidor duas vezes para verificar `REOPEN persistence` e inventário salvo. As capturas ficam em `run-periodic/screenshots` e os logs privados não entram no Git.
+
+A matriz de resultados e limitações está em [docs/TEST-RESULTS.md](docs/TEST-RESULTS.md).
