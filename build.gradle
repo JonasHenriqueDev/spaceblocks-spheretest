@@ -24,11 +24,13 @@ neoForge {
             systemProperty 'spaceblocks.testClient', 'true'
         }
         packagedPeriodicClient {
+            systemProperty 'spaceblocks.packagedTest', 'true'
             client(); loadedMods = []; gameDirectory = project.file('run-periodic')
             programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '720'
             systemProperty 'spaceblocks.testClient', 'true'
         }
         packagedPeriodicServer {
+            systemProperty 'spaceblocks.packagedTest', 'true'
             server(); loadedMods = []; gameDirectory = project.file('run-periodic')
             programArgument '--nogui'
             systemProperty 'spaceblocks.testServer', 'true'

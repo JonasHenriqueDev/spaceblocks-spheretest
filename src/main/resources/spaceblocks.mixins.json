@@ -21,7 +21,9 @@
     "client.PeriodicPickMixin",
     "client.PeriodicBlockEntityMixin",
     "client.PeriodicTeleportMixin",
-    "client.PeriodicGamePickMixin"
+    "client.PeriodicGamePickMixin",
+    "client.PeriodicBreakingMixin",
+    "client.PeriodicParticlesMixin"
   ],
   "injectors": {
     "defaultRequire": 1
