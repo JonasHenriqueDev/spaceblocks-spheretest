@@ -34,7 +34,22 @@ bin/
 
 ### Minecraft Modding ###
 run/
+run-smoke/
+dist/
+work/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+# Private runtime and recovery data
+logs/
+crash-reports/
+*.log
+saves/
+backups/
+.env
+.env.*
+*.jfr
+run-*/
+

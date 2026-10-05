@@ -39,15 +39,21 @@ displayName="${mod_name}" #mandatory
 #logoFile="examplemod.png" #optional
 
 # A text field displayed in the mod UI
-#credits="" #optional
+credits="Portal rendering concept inspired by Immersive Portals — qouteall and iPortalTeam. Independently implemented."
 
 # The authors of the mod, displayed in the mod UI (optional)
 #authors=""
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Example mod description.
+Exploração de planetas com seis faces planas conectadas por vistas de portais invisíveis.
+Use /planet, /planet small ou /planet colors em um mundo com comandos habilitados.
+Versão 0.5: renderização das faces vizinhas, relevo e construções na vista orbital.
+Créditos e documentação: CREDITS.md no projeto e no pacote de fontes.
 '''
+
+[[mixins]]
+config="spaceblocks.mixins.json"
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
 #[[mixins]]

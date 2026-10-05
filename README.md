@@ -1,25 +1,21 @@
+# Space Blocks 0.5.0
 
-Installation information
-=======
+Mod experimental para Minecraft Java 1.21.1 + NeoForge 21.1.255.
+Seis faces físicas planas, gravidade normal e bordas conectadas por vistas de
+portais invisíveis. O renderizador desenha geometria dos chunks reais da face
+vizinha, com transformações de câmera, máscara stencil e recorte por endereço.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+`/planet`: planeta grande com relevo contínuo entre faces (1.024 blocos por face).
+`/planet small`: planeta plano de faces de 64 blocos para testes rápidos.
+`/planet colors`: planeta grande com uma cor por face, para conferir as passagens.
+`/planet flat`: planeta plano grande da versão 0.4, preservando construções.
+`/planet view`, `/planet surface`, `/planet fly`, `/planet walk`, `/planet leave`.
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+A representação orbital inclui silhuetas texturizadas dos blocos modificados;
+o detalhe completo continua limitado à distância de renderização.
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+Guia: [TESTAR-NO-MODRINTH.md](TESTAR-NO-MODRINTH.md).
+Arquitetura: [ARQUITETURA-0.5.md](ARQUITETURA-0.5.md).
+Créditos: [CREDITS.md](CREDITS.md).
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
-
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+Base: [NeoForge MDK 1.21.1](https://github.com/NeoForgeMDKs/MDK-1.21.1-ModDevGradle).

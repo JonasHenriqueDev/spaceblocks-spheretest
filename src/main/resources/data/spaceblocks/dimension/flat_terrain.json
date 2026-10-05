@@ -1,0 +1,16 @@
+{
+  "type": "spaceblocks:flat",
+  "generator": {
+    "type": "spaceblocks:flat_planet",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "spaceblocks:vacuum"
+    },
+    "surface": {
+      "face_size": 1024,
+      "guard_size": 512,
+      "seed": 20261006,
+      "relief": true
+    }
+  }
+}

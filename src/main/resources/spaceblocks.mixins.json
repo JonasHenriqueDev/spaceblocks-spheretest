@@ -1,0 +1,33 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.jonas.spaceblocks.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "FlatBlockChangesMixin",
+    "FlatChunkUnloadMixin",
+    "LivingOrientationMixin",
+    "PlayerTravelMixin",
+    "EntityGeometryMixin",
+    "ServerMovementMixin"
+  ],
+  "client": [
+    "client.CameraMixin",
+    "client.PlayerModelMixin",
+    "client.BlockOverlayMixin",
+    "client.PlayerOffsetMixin",
+    "client.FlatMovementMixin",
+    "client.FlatTravelMixin",
+    "client.FlatPickMixin",
+    "client.FlatEntityRenderMixin",
+    "client.FlatChunkCacheMixin",
+    "client.FlatRendererAccess",
+    "client.FlatBufferAccess",
+    "client.FlatRenderCacheMixin",
+    "client.FlatShaderMixin",
+    "client.FlatBlockModelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
