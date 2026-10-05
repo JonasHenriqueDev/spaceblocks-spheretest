@@ -1,6 +1,12 @@
-# Space Blocks 0.8.2 — Spheretest
+# Space Blocks 0.8.3 — Spheretest
 
 Minecraft Java **1.21.1**, NeoForge **21.1.255**, **Java 21**. Um mapa plano quadrado finito, com bordas opostas conectadas, desenhado com a projeção exponencial relativa à câmera de **Jeija / Spheretest**. Armazenamento, colisões e gravidade permanecem planos.
+
+## Visão pelo túnel e diagnóstico 0.8.3
+
+A visão do terreno conectado pelo fundo acompanha a distância de renderização, limitada pelo servidor e pelo mapa. O carregamento adicional ocorre ao olhar para um poço aberto dentro desse alcance. Olhar para longe ou bloquear a passagem libera a região extra; uma área de segurança de 3×3 chunks permanece a até quatro blocos do fundo para a travessia física. A detecção usa cinco raios amostrados, portanto buracos estreitos no canto da tela podem exigir mirar diretamente. [Detalhes e testes](docs/BOTTOM-VIEW-0.8.3.md).
+
+Use `/planet shader false` para visualizar o mundo sem curvatura e `/planet shader true` para restaurá-la; `/planet shader` consulta o estado. É um diagnóstico local que não exige operador. Desativa a projeção do mod no terreno, entidades, partículas e seleção, mantendo armazenamento, bordas, colisões, gravidade e travessia. O atlas/HUD continua esquemático. A opção volta a `true` ao reiniciar o jogo. Não desliga shaders do Minecraft ou de outros mods.
 
 ## Proporção e orientação 0.8.2
 
@@ -16,7 +22,7 @@ Use `/planet tunnel axis` em uma área sem construções importantes, espere `Tu
 
 ## Jogar
 
-Instale apenas `spaceblocks-0.8.2.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
+Instale apenas `spaceblocks-0.8.3.jar` e habilite comandos no mundo. Os mapas e construções existentes são preservados.
 
 | Comando | Ação |
 | --- | --- |
@@ -39,6 +45,7 @@ Instale apenas `spaceblocks-0.8.2.jar` e habilite comandos no mundo. Os mapas e 
 | `/planet satellite info` / `remove` | Consultar trajetória/voltas ou remover sua sonda; no laboratório, controlar a sonda comum |
 | `/planet map` | Painel 3D: arrastar para girar, roda para zoom, tamanho, raio, fundo e cobertura |
 | `/planet hud` | Configuração local do globo no HUD e da transição de câmera; também em Mods → Space Blocks → Config |
+| `/planet shader [true\|false]` | Consultar, ligar ou desligar apenas a projeção visual do planeta, localmente |
 | `/planet tunnel axis` | Criar túnel de medição com entrada ciano, saída magenta e anéis iluminados a cada 8 blocos |
 | `/planet tunnel create` | Abrir dois poços conectados, no X/Z atual e meia volta em X; substitui blocos nas duas colunas de 5×5 |
 | `/planet tunnel drop` | Cair pelo túnel criado, atravessar o fundo, subir do outro lado e voltar a cair |
@@ -151,7 +158,7 @@ $env:JAVA_HOME = 'CAMINHO_DO_SEU_JDK_21'
 .\gradlew.bat build
 ```
 
-JAR: `build/libs/spaceblocks-0.8.2.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
+JAR: `build/libs/spaceblocks-0.8.3.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
 
 Créditos: [CREDITS.md](CREDITS.md). Fórmulas, unidades, origem e histórico: [auditoria do Spheretest](docs/SPHERETEST-SOURCES.md). LGPL-2.1-or-later; licença do MDK preservada. Os vídeos são creditados; foram lidos código, histórico e transcrição, sem alegar que os vídeos inacessíveis foram assistidos.
 

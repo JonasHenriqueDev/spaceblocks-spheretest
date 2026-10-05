@@ -1,4 +1,4 @@
-# Testar Space Blocks 0.8.2 no Modrinth
+# Testar Space Blocks 0.8.3 no Modrinth
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
@@ -84,3 +84,15 @@ O backup original 0.5.0 permanece em `C:\Dev\minecraft-space-mod-backup-0.5.0-20
 7. Use `/planet map` enquanto o HUD está ativo; o pedido manual tem prioridade sobre a atualização passiva. Use `/planet leave` e confirme que o HUD desaparece no mundo padrão.
 
 A versão 0.8.1 está guardada em `C:\Dev\minecraft-space-mod-backup-0.8.1-before-axis-20261005`. Para restaurar o JAR, feche o jogo por sua conta, retire a 0.8.2 e recoloque a 0.8.1 do backup. Não é necessário apagar saves para instalar esta versão.
+
+## Visão e shaders 0.8.3
+
+1. Reinicie para carregar a 0.8.3, com a mesma versão no cliente e servidor. A sessão aberta não é encerrada pela instalação.
+2. Em uma área livre, use `/planet tunnel axis`, aguarde `Tunnel ready` e confirme `/planet physics fallthrough true`. Essa opção é necessária para mostrar a passagem.
+3. Paire no poço acima do limite antigo de 16 blocos do fundo. Mire para baixo e aumente a distância de renderização até incluir essa diferença de altura. O servidor pode impor um alcance menor.
+4. Espere o carregamento progressivo. Olhe para uma parede ou para cima: o terreno oposto deve parar de desenhar. Volte a olhar para o fundo: a região será solicitada novamente. Tampando o poço também deve ocultar a passagem.
+5. Execute `/planet shader false`: terreno e entidades aparecem planos; o HUD não muda. Ande até uma borda e confira que ela continua conectada. Minere blocos próximos e confira o contorno e o bloco realmente quebrado.
+6. Execute `/planet shader true` para voltar à projeção. `/planet shader` informa o estado atual. Não precisa operador; não altera opções salvas de física ou de outros jogadores.
+7. Teste o fundo com ambos os estados; a área de segurança próxima continua carregada mesmo sem olhar. O alcance para quebrar blocos continua o alcance normal, não a distância de renderização.
+
+Código e JAR 0.8.2 foram preservados em `C:\Dev\minecraft-space-mod-backup-0.8.2-before-bottom-distance-20261005`. A atualização não remove saves. Reiniciar o jogo religa a projeção.
