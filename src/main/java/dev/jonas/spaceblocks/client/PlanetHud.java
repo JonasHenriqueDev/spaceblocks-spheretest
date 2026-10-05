@@ -16,6 +16,7 @@ public final class PlanetHud {
   private static String dimension = "";
   private static long nextRequest, crossing, lastFrame;
   private static double yaw, pitch;
+  private static float crossingPitch;
   private static int crossings;
   public static int renderedTriangles;
   public static boolean renderedMarker;
@@ -35,6 +36,11 @@ public final class PlanetHud {
   }
 
   public static void crossed() {
+    crossed(0, 0);
+  }
+
+  public static void crossed(float before, float after) {
+    crossingPitch = before - after;
     crossing = System.nanoTime();
     crossings++;
   }
@@ -47,6 +53,9 @@ public final class PlanetHud {
     }
     if (!PlanetHudConfig.transition || crossing == 0) return;
     double t = (System.nanoTime() - crossing) / (PlanetHudConfig.duration * 1_000_000.0);
+    double clamped = Math.max(0, Math.min(1, t));
+    double eased = clamped * clamped * (3 - 2 * clamped);
+    e.setPitch(e.getPitch() + (float) (crossingPitch * (1 - eased)));
     e.setRoll(e.getRoll() + HudGeometry.roll(t));
     if (t >= 1) crossing = 0;
   }

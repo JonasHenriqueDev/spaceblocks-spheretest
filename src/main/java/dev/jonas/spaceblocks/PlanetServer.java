@@ -146,13 +146,13 @@ public final class PlanetServer {
     }
     if (e instanceof ServerPlayer p) {
       p.serverLevel().getChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
-      // Zero relative rotation keeps mouse input made while the packet is in flight.
+      // Relative yaw preserves mouse input; bottom passage reflects pitch, ordinary seams keep it.
       p.connection.teleport(
           x,
           y,
           z,
           p.getYRot(),
-          p.getXRot(),
+          bounce ? -p.getXRot() : p.getXRot(),
           Set.of(
               net.minecraft.world.entity.RelativeMovement.X_ROT,
               net.minecraft.world.entity.RelativeMovement.Y_ROT));

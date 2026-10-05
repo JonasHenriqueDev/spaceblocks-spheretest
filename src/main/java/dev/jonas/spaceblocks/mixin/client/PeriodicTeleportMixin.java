@@ -12,7 +12,10 @@ abstract class PeriodicTeleportMixin {
   @Inject(method = "handleMovePlayer", at = @At("HEAD"))
   private void preserveVelocity(CallbackInfo ci) {
     var mc = Minecraft.getInstance();
-    if (mc.isSameThread() && PlanetClient.active() && mc.player != null)
+    if (mc.isSameThread() && PlanetClient.active() && mc.player != null) {
       PlanetClient.beforeTeleport = mc.player.getDeltaMovement();
+      PlanetClient.beforeTeleportPitch = mc.player.getXRot();
+      PlanetClient.beforeTeleportVisualPitch = mc.gameRenderer.getMainCamera().getXRot();
+    }
   }
 }

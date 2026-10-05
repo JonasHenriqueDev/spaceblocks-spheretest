@@ -12,11 +12,21 @@ public final class PlanetClient {
 
   public static volatile Audio audio;
   public static Vec3 beforeTeleport;
+  public static Float beforeTeleportPitch;
+  public static Float beforeTeleportVisualPitch;
 
   public static void restoreVelocity(PlanetNetwork.Velocity packet) {
     var player = Minecraft.getInstance().player;
     if (player == null) return;
-    if (packet.bounce()) PlanetHud.crossed();
+    if (packet.bounce()) {
+      float before = beforeTeleportPitch == null ? -player.getXRot() : beforeTeleportPitch;
+      player.setXRot(-before);
+      player.xRotO = player.getXRot();
+      PlanetHud.crossed(
+          beforeTeleportVisualPitch == null ? before : beforeTeleportVisualPitch, player.getXRot());
+    }
+    beforeTeleportPitch = null;
+    beforeTeleportVisualPitch = null;
     var v = beforeTeleport;
     beforeTeleport = null;
     player.setDeltaMovement(
