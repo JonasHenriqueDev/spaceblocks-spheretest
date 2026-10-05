@@ -23,6 +23,14 @@ public final class PlanetServer {
     SENT.remove(player);
   }
 
+  public static void dimensionChanged(
+      net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent event) {
+    if (event.getEntity() instanceof ServerPlayer player) {
+      reset(player);
+      if (Planet.of(player.level()) != null) PlanetNetwork.sync(player);
+    }
+  }
+
   public static void stopped(ServerStoppedEvent e) {
     SENT.clear();
     TICKETS.clear();

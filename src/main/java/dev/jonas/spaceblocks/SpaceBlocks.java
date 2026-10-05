@@ -39,6 +39,7 @@ public final class SpaceBlocks {
     NeoForge.EVENT_BUS.addListener(PlanetCommands::register);
     NeoForge.EVENT_BUS.addListener(PlanetServer::tick);
     NeoForge.EVENT_BUS.addListener(PlanetServer::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetServer::dimensionChanged);
     NeoForge.EVENT_BUS.addListener(PlanetTests::started);
     NeoForge.EVENT_BUS.addListener(PlanetNetworkTests::joined);
     LOGGER.info(
