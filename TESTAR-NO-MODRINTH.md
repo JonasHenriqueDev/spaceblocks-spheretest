@@ -1,8 +1,17 @@
-# Testar Space Blocks 0.7.1 no Modrinth
+# Testar Space Blocks 0.8.0 no Modrinth
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
 ## Acesso ao mapa e ao interior
+
+- `/planet lab`: aguarde `Test lab ready`. Teste torres em X=16/24/32, seleção/baú em X=-5 e plataformas em X/Z=±416, Y=180. Mine o terreno natural e cavernas abaixo do deck. O laboratório é separado do planeta de jogo.
+- `/planet satellite info`: observe posição e voltas. Compare `/planet satellite launch 128 1`, fatores 0.8/1.2 e `centrifugal false/true`. A sonda dourada tem elytra e não colide. Salve/reabra e confira sua retomada. A sonda do laboratório é comum aos operadores.
+- No atlas, abra `Planets`. Gere `aurora`, raio 64 e seed em branco; gere outro nome com raio 128. Confira tamanhos e terrenos diferentes. Teste uma seed explícita em nomes diferentes e salve/reabra. `/planet natural` continua entrando no mapa antigo salvo.
+- Selecione um planeta na lista e teste `Teleport`/`Enter + map` com X/Z e `surface`; repita com Y=200. Confira normalização de bordas, nome/raio e preservação de construções em outros planetas.
+
+- `/planet map`: gire arrastando, amplie/reduza com a roda, alterne `Globe atlas`/`Spheretest view`, `Loaded`, `Center`, `Reset` e `Refresh`. Confira tamanho 224 no pequeno e 1632 no natural. Edite uma superfície carregada e atualize. Previsões fora do alcance não confirmam construções salvas.
+- Em um local sem construções importantes, `/planet tunnel create` substitui duas colunas de 5×5 até o fundo. Espere `Tunnel ready`, execute `/planet tunnel drop` e observe queda, deslocamento horizontal, subida na outra saída e retorno. `/planet surface` deve sair do poço. Teste no pequeno e no natural, salve e reabra.
+- Para cavar manualmente, `/planet physics fallthrough true` torna a bedrock do planeta minerável. Abra a outra saída em X + metade do tamanho do mapa, com o mesmo Z. Ligue `realistic_gravity true`, `air_drag false` e `centrifugal false` para a mesma configuração da queda demonstrada. Compare `air_drag true`, que amortece a oscilação.
 
 1. `/planet natural` e `/planet info`. Confira relevo e biomas. Use `/planet fly` para observar a curvatura e Espaço/Shift para mudar a altitude.
 2. Voo tem colisão. Para atravessar pedra: `/planet noclip true`. Para sair: `/planet noclip false`, que retorna à superfície e restaura seu modo de jogo.
@@ -35,14 +44,21 @@ Os testes anteriores usavam alcance 5; a 0.7.1 acrescenta uma rodada isolada de 
 
 - `runPackagedPeriodicServer`: diretório `run-periodic`; bateria dos mapas planos, terreno natural e estruturas. Rode duas vezes para verificar reabertura. Configure `server.properties` com mundo plano local, seed=0, alcance 4/5 e EULA conforme sua aceitação.
 - `runPackagedPeriodicClient`: `run-periodic/saves/PeriodicTest`. Copie para lá um mundo de teste fechado do servidor. Usa teclado, seleção, pacotes reais, mineração profunda, câmera, núcleo, noclip e barco; produz screenshots.
+- `runPackagedAtlasClient`: `run-atlas/saves/PeriodicTest`, cópia isolada fechada. Usa apenas o JAR em `mods`; testa painel, rotação/zoom, atualização da altura, túneis e oscilação no pequeno/natural. Execute novamente para validar opções salvas. Produz `atlas-client-results.txt` e screenshots.
+- `runPackagedLabClient`: mesmo save isolado do atlas; verifica laboratório, sonda, catálogo, geração e teleporte. Depois de uma execução inicial, use `runPackagedLabClient -PverifyPersistence=true` para exigir construção e índice da sonda já salvos, em vez de apenas preparar dados novos.
 - `runPeriodicNetworkServer`: `run-network-server`, `127.0.0.1:25580`, `online-mode=false`, EULA conforme sua aceitação. Carrega somente o JAR; o flag de teste concede operador aos jogadores. Nunca exponha esse run à internet.
 - `runPeriodicNetworkClient`: `run-network-client`, conexão TCP ao servidor acima. Verifica comandos, movimento, mineração/construção e redstone através da borda, núcleo e noclip. Ao passar, salva e encerra o servidor de teste.
+- Para dois jogadores: inicie `runPeriodicNetworkObserver` e `runPeriodicNetworkClient -PtwoClients=true`, com JAR idêntico nos três diretórios. O cliente `Observer` usa outro nome/UUID, coloca esmeralda, recebe a alteração para ouro feita pelo primeiro cliente e permanece conectado até o encerramento. Não exponha esses runs à internet.
 
 Copie o JAR final para `mods` de cada run e remova versões antigas dessas pastas de teste. Os flags não são habilitados em instalação normal. Console/resultados ficam locais, fora do Git.
 
 Verifique `PERIODIC_CLIENT_TEST_PASS`, `PERIODIC_SERVER_TEST_PASS` e `PERIODIC_NETWORK_TEST_PASS`, além dos arquivos de resultados em cada diretório. O exit code sozinho não comprova aprovação: uma falha controlada pode fechar o jogo normalmente.
 
 ## Recuperação
+
+A entrega 0.8.0 inclui o mundo local **Space Blocks Lab 0.8.0** na instância Modrinth, em criativo e com comandos. Abra-o e use `/planet lab` para acessar as plataformas/torres e `/planet map` para o painel. Use `/planet satellite info` para consultar a sonda comum. Para testar queda, crie os dois poços com `/planet tunnel create`, aguarde `Tunnel ready` e execute `/planet tunnel drop`. Consulte [o relatório 0.8.0](docs/ATLAS-LAB-0.8.0.md) para os resultados e limitações.
+
+O código/JAR anterior à 0.8.0 está em `C:\Dev\minecraft-space-mod-backup-0.7.1-before-atlas-20261005`. Para restaurar, feche o jogo e recoloque o JAR 0.7.1 guardado, retirando a 0.8.0 da pasta `mods`. Não abra saves que receberam planetas gerados da 0.8.0 em versões anteriores; conserve o save original ou uma cópia fechada compatível.
 
 Antes da atualização, foi guardado `C:\Dev\minecraft-space-mod-backup-0.6.0-20261005`, com código, JAR 0.6.0 e saves. A tag pública `v0.6.0` conserva o código. Para voltar, feche o jogo, substitua o JAR e restaure o save correspondente do backup; um mundo já salvo com dimensões da 0.7.0 pode não carregar na versão anterior sem restaurar o save.
 
