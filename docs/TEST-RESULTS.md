@@ -1,50 +1,51 @@
-# Resultados da versão 0.6.0
+# Resultados — Space Blocks 0.7.0
 
-Validação local em Windows, Java 21, Minecraft 1.21.1 e NeoForge 21.1.255. Data: 05/10/2026. As sessões automáticas foram iniciadas pelo desenvolvimento em `run-periodic`; nenhum mundo original da instância Modrinth foi usado ou apagado.
+Validação em Windows, Minecraft 1.21.1, NeoForge 21.1.255 e Java 21, em 05/10/2026. Foram usados mundos e processos de teste próprios; os saves do Modrinth não foram usados pelos harnesses.
 
-## Artefato validado
+## Artefato
 
-`spaceblocks-0.6.0.jar`
+`spaceblocks-0.7.0.jar`
 
-SHA-256: `5A53EC30A91EF2FD6977EDA2467D08658346BD13AAC7B5AF4D703BACFFC2CB3F`
+SHA-256: `19A1AAA4E582B01F65A7BD379B1C687ADE70159F8DAF007B8087BE15A0559F9D`
 
-Os runs empacotados usam `loadedMods=[]` e verificam a origem das classes no JAR. Cliente e servidor passaram com esse mesmo artefato. Não se trata apenas de uma compilação ou de um shader isolado.
+O cliente empacotado verifica a origem das classes no JAR. Os runs de rede também usam `loadedMods=[]` com esse mesmo JAR. O teste TCP tem cliente e servidor em JVMs separadas, usando loopback, sem servidor integrado no cliente.
 
-## Matriz
+## Testes e dados
 
-| Verificação | Evidência / resultado |
+| Área | Resultado e alcance |
 | --- | --- |
-| Build Java 21 | `gradlew build` aprovado; 7 testes JUnit, sem falhas |
-| Matemática da técnica | Fórmula exponencial, casos de referência, 10.000 inversões, proporção no corte vertical, nove deslocamentos, periodicidade e coeficientes de física aprovados |
-| Quatro bordas e diagonal | Cliente real movimentado com W, rotação da câmera preservada; servidor verifica posição, velocidade, yaw/pitch nos dois planetas |
-| Voltas completas | Quatro voltas físicas automáticas por planeta: direções positiva/negativa de X e Z, usando movimento e colisão de entidade |
-| Chunks e blocos | Endereço canônico compartilhado pelas nove representações; escrita, mineração e colisão na borda aprovadas nos dois planetas |
-| Construção e inventários | Pacotes reais de construção/mineração; parede atravessando borda, baú único e conteúdo persistido aprovados |
-| Renderização | VBOs efetivamente compilados/desenhados, terreno, água, baú e entidades em capturas; planetas pequeno e maior renderizados |
-| Seleção e entidades | Seleção projetada de TNT e de entidade pelo lado conectado; pacote real de ataque aprovado |
-| TNT | Casos matemáticos em diferentes alturas, torres e seleção em capturas; explosões no servidor em Y=80/120/180 e dano a entidade através da borda aprovados |
-| Mineração profunda | Cliente minerou para baixo nos dois planetas; no maior ultrapassou Y=-150; servidor verificou túneis e colisões profundas, sem crash |
-| Subida e descida | Câmera em diferentes altitudes e descida em shafts; controles nativos de voo documentados |
-| Física | Coeficientes de gravidade e centrífugo, opções sincronizadas e fundo ligado/desligado aprovados no servidor; travessia do fundo e meio mapa aprovados no cliente |
-| Salvamento e reabertura | Servidor encerrado e reaberto: marcador de diamante e inventário de três diamantes preservados nos dois planetas; cliente abriu um save fechado e encerrou normalmente |
-| Comandos | Entrada nos dois planetas, opções de física e retorno ao mundo padrão aprovados |
+| Build e matemática | 11 testes JUnit aprovados: fórmula original, inversão, nove deslocamentos, voltas, gravidade/centrífugo; periodicidade suave do terreno, cavernas, clima e estruturas; diferença entre seeds |
+| Cliente real empacotado | 34 verificações aprovadas: VBO/terreno, TNT/seleção, pacotes reais de mineração/construção, quatro bordas e diagonal com W, yaw, mineração profunda nos dois planos, opções, fundo, planeta natural, core/noclip/restauração, barco controlado e portal do Nether de ida/volta |
+| Rede TCP | 14 verificações aprovadas: JVMs separadas, entrada/saída, movimento na borda, updates, energia e tick atrasado de lâmpada, mineração/construção por pacotes através da borda, natural/core/noclip/retorno seguro |
+| Servidor | Baterias aprovadas nos dois planos, incluindo nove representações, chunks únicos, inventário, mineração/colisão, quatro voltas físicas por planeta, bordas/diagonal, velocidade/rotação, física, fundo, TNT e reabertura |
+| IA e passageiros | Pathfinding por conexão curta, controle de movimento e linha de visão através da borda; barco com passageiro mantém vínculo e posição. O cliente também atravessou controlando um barco |
+| Terreno natural | Amostra de 121 colunas: alturas Y=28..149, sete biomas, 12.142 amostras de ar de cavernas, 3.631 blocos de minério na amostra e 40 colunas com água/gelo em Y=64; alturas equivalentes nas bordas |
+| Estruturas reais | Chunk gerado contém baú e entidade de bloco com tabela `minecraft:chests/simple_dungeon`. Inspeção offline dos arquivos Anvil confirmou galerias de madeira, loot e spawners de zombie; nenhum chunk com terreno fora do intervalo canônico |
+| Salvamento | Servidor encerrado/reaberto, diamantes de verificação e baú com três diamantes preservados nos dois planos. Chunk natural e tabela de loot lidos após geração/salvamento. Cliente encerrou normalmente após os testes |
+| Portal | Portal real construído pela API vanilla levou o jogador ao Nether; após sair, aguardar cooldown e entrar novamente, retornou à dimensão natural de origem |
 
-O harness do cliente registrou **22 verificações aprovadas**. O servidor registrou **duas baterias aprovadas**, uma por planeta, incluindo `REOPEN persistence`. Os arquivos de resultados e console ficam locais e não são publicados como logs privados.
+As voltas completas foram físicas e automáticas com entidade; bordas/diagonal também foram percorridas pelo jogador com teclado. Capturas registram relevo, TNT, câmara iluminada e barco. Não se usa apenas screenshot ou exit code como prova: os marcadores de aprovação e arquivos de resultados foram conferidos.
 
-## Correções verificadas durante a integração
+## Mudanças que corrigem os limites anteriores
 
-Foram corrigidos a declaração de shadow do cache de chunks, acesso concorrente ao cache, identificador GLSL reservado, seleção do overload de partículas e iteração sobre entidades durante mudança de chunk. As rodadas finais empacotadas passaram depois dessas correções. A velocidade local do jogador é preservada após o pacote de teleporte da borda; no fundo seu componente vertical é invertido.
+- O natural permite explorar até a bedrock profunda, sem o deslocamento automático do fundo por padrão. `core` abre acesso iluminado; `noclip` atravessa pedra e restaura o modo anterior em uma superfície segura.
+- Terreno/clima/cavernas e estruturas são periódicos; não há decoração vanilla não periódica atravessando a costura. A dimensão natural é separada dos planos antigos.
+- Chunk streaming não bloqueia o tick esperando geração. Veículos sincronizam passageiros e a referência de posição usada para validar pacotes.
+- A rotação de travessia é enviada como deslocamento zero relativo ao cliente, preservando movimentos do mouse durante transmissão. Foi corrigida e retestada uma regressão encontrada nessa mudança.
+- Transparência ordena seções e quads usando geometria projetada. Partículas consideram a representação próxima na admissão, envio, projeção e culling.
+- Sons são enviados por distância periódica e canais ativos mantêm a posição próxima durante a travessia. Caminhos, movimento, olhar e linha de visão dos mobs usam alvos periódicos. Ticks de blocos/fluidos usam posição canônica.
+- Portais do Nether guardam a origem do planeta e buscam saídas nas representações conectadas. O rastreamento confere a dimensão dona dos chunks e limpa o estado de envio em cada troca; o aviso de passageiros desconhecidos não reapareceu na rodada final.
 
-## Alcance da validação
+## O que essa validação não significa
 
-As voltas completas foram automáticas com uma entidade física; as travessias de bordas/diagonal foram também executadas pelo jogador no cliente. Isso não substitui uma avaliação prolongada da sensação da câmera e do desempenho no computador do jogador. As capturas demonstram a geometria, mas não certificam ausência de toda deformação tridimensional: a técnica conserva escala no corte vertical e depende da câmera.
+O gerador oferece componentes de um mundo natural, mas **não reproduz todo o worldgen vanilla**: suas cabanas, galerias e câmaras são próprias, sem todas as vilas/fortalezas do Overworld. A técnica do Spheretest não tem um centro geométrico finito em coordenadas planas nem uma posição global independente da câmera.
 
-O save principal das capturas foi criado antes de retirar a decoração vanilla; contém flores/grama dessa preparação antiga. O gerador final não aplica decoração, carvers ou estruturas. Uma rodada adicional em save novo (`PeriodicFresh`) passou com o mesmo JAR final, incluindo geração e a bateria do servidor nos dois planetas. Essa rodada escreveu seus primeiros marcadores; a comprovação de reabertura é da rodada anterior em `PeriodicTest`.
+A direção e rotação foram verificadas automaticamente; percepção da câmera e desempenho em sessões prolongadas continuam avaliações de jogo. A reprodução sonora foi implementada e executada nos clientes, mas não foi certificada por uma avaliação auditiva humana. Não foram esgotados todos os ataques especiais de mobs, montarias/minecarts, circuitos/máquinas de redstone ou casos de polígonos transparentes que se intersectam.
 
-O mesmo hash foi conferido depois da instalação na instância Modrinth `NeoForge 1.21.1`, que ficou com um único JAR do mod. A sessão normal iniciada pelo Modrinth App não foi aberta como parte da validação: o cliente empacotado foi executado no ambiente isolado com as mesmas versões de Minecraft/NeoForge/Java.
+A rede foi testada em TCP local: não foram medidas latência/perda de pacotes de hospedagem na internet. O conjunto validado contém Space Blocks e NeoForge. Compatibilidade com todos os mods/renderizadores/shaderpacks não pode ser garantida sem um conjunto específico; não foram instalados outros mods na instância do usuário.
 
-Não houve validação completa de multiplayer remoto, veículos/montarias, sons através da borda, pathfinding, portais vanilla, redes complexas de redstone, partículas distantes através das bordas, ordenação integral de transparência ou compatibilidade com outros renderizadores/mods. A travessia do fundo pode colocar uma entidade dentro de pedra: é a regra original, documentada no README. O guia manual indica como avaliar esses limites sem apresentar o sistema como uma esfera física perfeita.
+As capturas finais do mundo novo usam o gerador plano sem decoração antiga e a dimensão natural com os recursos novos. A leitura de código/histórico/transcrição do Spheretest continua documentada em [SPHERETEST-SOURCES.md](SPHERETEST-SOURCES.md); não se afirma ter assistido aos vídeos inacessíveis. Os resultados históricos da 0.6.0 estão em [TEST-RESULTS-0.6.md](TEST-RESULTS-0.6.md).
 
-## Origem e acesso aos vídeos
+## Instalação e recuperação
 
-Foram lidos a transcrição fornecida, o código do Spheretest e seu histórico, inclusive a reversão `d973e4b40dc0da723921563ff2093e105c345892`. Os links dos vídeos foram consultados, mas o acesso não permitiu assistir ao conteúdo; não se afirma que os vídeos foram assistidos. A auditoria detalhada está em [SPHERETEST-SOURCES.md](SPHERETEST-SOURCES.md).
+O backup 0.6.0 teve seu JAR e 259 arquivos de saves conferidos por SHA-256 antes da instalação. O JAR instalado deve ter o hash acima e ser a única versão Space Blocks na pasta `mods`. Os backups locais e saves não são publicados. A instância normal pelo Modrinth App não foi aberta como parte dos harnesses; o JAR foi executado nos clientes isolados descritos acima.

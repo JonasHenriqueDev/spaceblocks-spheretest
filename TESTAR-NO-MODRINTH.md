@@ -1,45 +1,43 @@
-# Testar Space Blocks 0.6.0 no Modrinth App
+# Testar Space Blocks 0.7.0 no Modrinth
 
-Minecraft Java 1.21.1 + NeoForge 21.1.255 + Java 21. Instância: `NeoForge 1.21.1`.
+Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
-## Instalação e recuperação
+## Acesso ao mapa e ao interior
 
-O JAR 0.6.0 foi instalado na pasta `mods` da instância, com hash conferido contra o artefato testado. Ele é o único `spaceblocks-*.jar` nessa pasta; o 0.5.0 foi movido para o backup externo. Crie um mundo novo com comandos habilitados. Mundos anteriores à 0.6.0 não devem ser usados para testar a topologia nova.
+1. `/planet natural` e `/planet info`. Confira relevo e biomas. Use `/planet fly` para observar a curvatura e Espaço/Shift para mudar a altitude.
+2. Voo tem colisão. Para atravessar pedra: `/planet noclip true`. Para sair: `/planet noclip false`, que retorna à superfície e restaura seu modo de jogo.
+3. `/planet core` cria uma pequena câmara iluminada e fechada em Y=-471. É acesso ao interior profundo; a técnica relativa à câmera não tem um centro geométrico finito.
+4. `/planet surface` e `/planet leave` devem devolver você a posições seguras. Confira suas habilidades e modo de jogo após sair.
 
-A recuperação 0.5.0 está na tag Git `recovery-0.5.0`. O backup completo local é `C:\Dev\minecraft-space-mod-backup-0.5.0-20261005`: projeto, JAR antigo e saves originais. Para restaurar, feche o jogo, retire o JAR 0.6.0, copie o JAR 0.5.0 desse backup para `mods` e restaure o save correspondente se necessário. Não misture os dois JARs. O backup local não foi publicado.
+A dimensão natural é nova. Os mapas planos 0.6.0 continuam disponíveis em `/planet small` e `/planet flat`; suas construções não são regeneradas. Novos recursos não são inseridos em chunks já gerados durante testes preliminares de desenvolvimento.
 
-## Roteiro no planeta pequeno
+## Roteiro de jogo
 
-1. `/planet small`, `/planet info`. O intervalo é [-112,112) em X e Z. Anote a posição; caminhe através de X=112, X=-112, Z=112 e Z=-112. Depois atravesse um canto na diagonal. WASD, yaw e pitch devem manter sua direção.
-2. Faça uma volta completa em X e outra em Z. Volte à posição anotada sem mudança de altura do terreno. As voltas automáticas incluem as duas direções de cada eixo; a percepção do movimento continua sendo uma verificação manual útil.
-3. Construa entre X=110,111 e a representação X=112,113, que corresponde a X=-112,-111. Coloque e remova blocos dos dois lados; confira o mesmo inventário de um baú pelo lado conectado. Repita em Z e no canto.
-4. Construa torres e coloque TNT em Y=81,96,112. Compare o formato ao mudar a altura da câmera com `/planet fly`. A correção é a exponencial do corte vertical; não espere que toda perspectiva tridimensional seja idêntica à de um cubo em uma esfera física.
-5. Abra túneis perto das bordas e cave para baixo. O fundo é Y=32. `/planet physics fallthrough false` permite observar a queda sem a mudança de lado; ligue de novo antes do teste de travessia. Abra também um corredor de saída no lado oposto para evitar emergir dentro de pedra.
-6. `/planet physics realistic_gravity true`; compare saltos e queda em altitudes diferentes. Teste `centrifugal true` e `false` durante deslocamento horizontal. Não há ajuste da velocidade pelo tamanho visual dos blocos.
-7. Confira seleção de blocos, porcos, itens caídos, TNT acesa, água, baús e mão em primeira pessoa, inclusive perto de uma borda. A mão deve continuar normal; objetos do mundo devem acompanhar o terreno.
-8. `/planet leave`. Confira posição e habilidades de voo no mundo de origem.
+- Atravesse X=±816 e Z=±816 no mapa natural, inclusive uma diagonal. Faça uma volta em cada direção. No pequeno os limites são ±112. Compare orientação e velocidade.
+- Construa, mine e abra um baú pelo lado conectado. Teste no canto também. Confira que há um inventário único.
+- Crie um circuito de redstone que atravesse a borda. Ligue/desligue uma lâmpada; observe repetidores e pistões. Ticks não devem causar crash.
+- Atravesse uma borda montado em barco/cavalo e em um minecart. O passageiro deve continuar montado. Compare câmera durante movimento e curvas.
+- Observe mobs perseguindo alvos pelo lado conectado, evitando obstáculos. Teste também mobs com ataques especiais; esses comportamentos precisam de avaliação individual.
+- Escute sons perto da borda e durante travessia; observe partículas de mineração, TNT e fogo. Coloque vidro/água em várias alturas e direções de câmera.
+- Teste torres de TNT, iluminação de cavernas, túneis e mineração até a bedrock. Procure galerias, câmaras de loot e cabanas.
+- Compare `/planet physics realistic_gravity true/false`, `centrifugal true/false` e `fallthrough true/false`. No natural o fundo começa desligado. A travessia ligada pode colocar você dentro da pedra do lado oposto, seguindo a regra original.
+- Salve, feche e reabra. Confira construções, mineração, baú, opções e modo de jogo. Avalie desempenho em uma sessão mais longa e ajuste render distance.
 
-## Planeta maior e salvamento
+## Harnesses reproduzíveis
 
-`/planet large` usa [-816,816) em X/Z, fundo Y=-192. Repita construção e mineração profunda, suba/desça com voo e ajuste a distância de renderização à sua máquina. Salve, feche o Minecraft e reabra; confirme construções, inventários, blocos minerados e opções de física. Guarde um screenshot da posição antes/depois para comparar.
+`gradlew build` executa JUnit. Os runs empacotados desativam o carregamento das classes de desenvolvimento como mod e verificam a origem no JAR em `mods` do diretório de teste.
 
-## Harnesses isolados no projeto
+- `runPackagedPeriodicServer`: diretório `run-periodic`; bateria dos mapas planos, terreno natural e estruturas. Rode duas vezes para verificar reabertura. Configure `server.properties` com mundo plano local, seed=0, alcance 4/5 e EULA conforme sua aceitação.
+- `runPackagedPeriodicClient`: `run-periodic/saves/PeriodicTest`. Copie para lá um mundo de teste fechado do servidor. Usa teclado, seleção, pacotes reais, mineração profunda, câmera, núcleo, noclip e barco; produz screenshots.
+- `runPeriodicNetworkServer`: `run-network-server`, `127.0.0.1:25580`, `online-mode=false`, EULA conforme sua aceitação. Carrega somente o JAR; o flag de teste concede operador aos jogadores. Nunca exponha esse run à internet.
+- `runPeriodicNetworkClient`: `run-network-client`, conexão TCP ao servidor acima. Verifica comandos, movimento, mineração/construção e redstone através da borda, núcleo e noclip. Ao passar, salva e encerra o servidor de teste.
 
-Os testes de unidade rodam com `gradlew build`. Os clientes automáticos usam teclado simulado pelo próprio Minecraft, ray picking real, pacotes de mineração/construção, capturas pelo Minecraft e um servidor integrado. Não controlam outra sessão do usuário.
+Copie o JAR final para `mods` de cada run e remova versões antigas dessas pastas de teste. Os flags não são habilitados em instalação normal. Console/resultados ficam locais, fora do Git.
 
-Os runs `periodicServer` e `periodicClient` usam `run-periodic`. Os runs `packagedPeriodicServer` e `packagedPeriodicClient` usam `loadedMods=[]` e verificam que a origem da classe do mod é o JAR final em `run-periodic/mods/spaceblocks-0.6.0.jar`. O mundo isolado se chama `PeriodicTest`: o servidor dedicado usa `run-periodic/PeriodicTest`; para o cliente copie esse mundo fechado para `run-periodic/saves/PeriodicTest`.
+Verifique `PERIODIC_CLIENT_TEST_PASS`, `PERIODIC_SERVER_TEST_PASS` e `PERIODIC_NETWORK_TEST_PASS`, além dos arquivos de resultados em cada diretório. O exit code sozinho não comprova aprovação: uma falha controlada pode fechar o jogo normalmente.
 
-Prepare `eula.txt` conforme sua aceitação do EULA, `server.properties` com mundo plano, modo criativo, `online-mode=false`, `server-ip=127.0.0.1`, porta livre e alcance 4 ou 5. Isso serve somente ao teste local. O cliente aceita automaticamente as telas de início/aviso apenas com a propriedade de teste ativada.
+## Recuperação
 
-```powershell
-.\gradlew.bat runPeriodicServer
-.\gradlew.bat runPeriodicClient
-.\gradlew.bat build
-Copy-Item build/libs/spaceblocks-0.6.0.jar run-periodic/mods/spaceblocks-0.6.0.jar
-.\gradlew.bat runPackagedPeriodicServer
-.\gradlew.bat runPackagedPeriodicClient
-```
+Antes da atualização, foi guardado `C:\Dev\minecraft-space-mod-backup-0.6.0-20261005`, com código, JAR 0.6.0 e saves. A tag pública `v0.6.0` conserva o código. Para voltar, feche o jogo, substitua o JAR e restaure o save correspondente do backup; um mundo já salvo com dimensões da 0.7.0 pode não carregar na versão anterior sem restaurar o save.
 
-Confira os arquivos `periodic-server-results.txt` e `periodic-client-results.txt` dentro de `run-periodic`, além dos marcadores `PERIODIC_SERVER_TEST_PASS` / `PERIODIC_CLIENT_TEST_PASS` no console. **O exit code do jogo isoladamente não comprova aprovação do harness**: uma falha controlada também pode fechar o jogo normalmente. Rode o servidor duas vezes para verificar `REOPEN persistence` e inventário salvo. As capturas ficam em `run-periodic/screenshots` e os logs privados não entram no Git.
-
-A matriz de resultados e limitações está em [docs/TEST-RESULTS.md](docs/TEST-RESULTS.md).
+O backup original 0.5.0 permanece em `C:\Dev\minecraft-space-mod-backup-0.5.0-20261005` e a tag `recovery-0.5.0` permanece publicada. Nenhum save original foi apagado.
