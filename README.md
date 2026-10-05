@@ -1,10 +1,10 @@
-# Space Blocks 0.7.0 — Spheretest
+# Space Blocks 0.7.1 — Spheretest
 
 Minecraft Java **1.21.1**, NeoForge **21.1.255**, **Java 21**. Um mapa plano quadrado finito, com bordas opostas conectadas, desenhado com a projeção exponencial relativa à câmera de **Jeija / Spheretest**. Armazenamento, colisões e gravidade permanecem planos.
 
 ## Jogar
 
-Instale apenas `spaceblocks-0.7.0.jar` e habilite comandos no mundo. Os mapas planos da 0.6.0 são preservados; o terreno natural tem uma dimensão nova e não substitui suas construções.
+Instale apenas `spaceblocks-0.7.1.jar` e habilite comandos no mundo. Os mapas planos da 0.6.0 são preservados; o terreno natural tem uma dimensão nova e não substitui suas construções.
 
 | Comando | Ação |
 | --- | --- |
@@ -67,9 +67,21 @@ Não existe compensação de velocidade pelo tamanho visual dos blocos. A gravid
 
 ## Verificação e limites
 
-[Guia de testes](TESTAR-NO-MODRINTH.md) e [resultados](docs/TEST-RESULTS.md) distinguem execução real, testes de matemática, dados salvos e avaliação manual. O JAR final é testado como mod empacotado, incluindo cliente integrado e conexão TCP a um servidor dedicado separado.
+[Guia de testes](TESTAR-NO-MODRINTH.md) e [resultados](docs/PERFORMANCE-0.7.1.md) distinguem execução real, testes de matemática, dados salvos e avaliação manual. O JAR final é testado como mod empacotado, incluindo cliente integrado e conexão TCP a um servidor dedicado separado.
 
 O alcance de chunks limita a porção visível do planeta; não há malha orbital global. Aumentar alcance custa CPU, memória, rede e GPU. Transparência ainda tem os limites de ordenação de polígonos que se intersectam. A validação de IA não cobre individualmente cada mob, ataque especial e goal; a de veículos inclui barco controlado pelo jogador e passageiros no servidor. A validação de redstone inclui transmissão de energia e ticks através da borda, não todas as máquinas possíveis. O teste TCP é local; não mede latência de uma hospedagem na internet. Mods que substituem o renderizador/shaders exigem validação própria e não têm compatibilidade universal garantida.
+
+## Otimização 0.7.1
+
+A geração reaproveita a interpolação horizontal do ruído das cavernas por coluna, mantendo os mesmos resultados, e calcula árvores uma vez por coluna. O preenchimento roda no executor de geração, com as seções protegidas durante a escrita.
+
+O streaming pede até quatro tickets novos por tick e mantém até 16 solicitações ainda não prontas. Chunks próximos têm prioridade; o envio continua limitado a seis por tick. Isso distribui a carga inicial sem bloquear o tick para esperar cada chunk.
+
+A montagem de malhas usa dois workers, no máximo quatro tarefas em andamento, com snapshots de regiões como no renderizador vanilla. O upload de VBO permanece na thread de renderização. Superfície tem prioridade quando a câmera está acima do chão; blocos opacos completamente cercados não passam pela montagem de modelos. A câmera subterrânea mantém prioridade por proximidade. A faixa vertical acompanha a distância de renderização e mantém o chão no alcance quando a câmera sobe, em vez de montar toda a coluna até Y=-500. A ordenação de transparência inclui apenas malhas que possuem essa camada.
+
+O cache mantém as seções atualmente necessárias e libera as que saem do alcance. Não existe mais o limite fixo de 2.048 que podia expulsar seções ainda visíveis. A chegada de chunks invalida também as faces e iluminação dos vizinhos, inclusive nas bordas periódicas. Geração inicial e voo rápido ainda podem exigir carregamento progressivo; isso não é pré-geração de todo o planeta.
+
+A validação específica está em [PERFORMANCE-0.7.1.md](docs/PERFORMANCE-0.7.1.md). Os resultados funcionais históricos da 0.7.0 permanecem no relatório anterior.
 
 ## Compilar
 
@@ -78,7 +90,7 @@ $env:JAVA_HOME = 'CAMINHO_DO_SEU_JDK_21'
 .\gradlew.bat build
 ```
 
-JAR: `build/libs/spaceblocks-0.7.0.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
+JAR: `build/libs/spaceblocks-0.7.1.jar`. Os harnesses ficam inativos em uso normal. Nunca habilite os flags do servidor de teste em uma hospedagem pública; o run de rede concede operador aos jogadores de teste e usa somente loopback.
 
 Créditos: [CREDITS.md](CREDITS.md). Fórmulas, unidades, origem e histórico: [auditoria do Spheretest](docs/SPHERETEST-SOURCES.md). LGPL-2.1-or-later; licença do MDK preservada. Os vídeos são creditados; foram lidos código, histórico e transcrição, sem alegar que os vídeos inacessíveis foram assistidos.
 

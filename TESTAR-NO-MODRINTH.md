@@ -1,4 +1,4 @@
-# Testar Space Blocks 0.7.0 no Modrinth
+# Testar Space Blocks 0.7.1 no Modrinth
 
 Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Mantenha somente um JAR Space Blocks em `mods`.
 
@@ -10,6 +10,12 @@ Minecraft 1.21.1 / NeoForge 21.1.255 / Java 21. Use comandos habilitados. Manten
 4. `/planet surface` e `/planet leave` devem devolver você a posições seguras. Confira suas habilidades e modo de jogo após sair.
 
 A dimensão natural é nova. Os mapas planos 0.6.0 continuam disponíveis em `/planet small` e `/planet flat`; suas construções não são regeneradas. Novos recursos não são inseridos em chunks já gerados durante testes preliminares de desenvolvimento.
+
+## Carregamento e desempenho
+
+Use renderização e simulação em 12 chunks para repetir o caso que expôs o problema. Entre com `/planet natural` e aguarde o carregamento progressivo; a superfície deve preencher e permanecer visível. Depois caminhe, voe e atravesse uma borda. Confira o subterrâneo com `/planet core`, volte com `/planet surface` e reabra o mundo.
+
+Os testes anteriores usavam alcance 5; a 0.7.1 acrescenta uma rodada isolada de geração natural do zero com alcance 12. Não é necessário apagar mundos ou regenerar a dimensão para instalar a correção. Conserve suas construções.
 
 ## Roteiro de jogo
 
