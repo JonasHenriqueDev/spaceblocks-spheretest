@@ -85,6 +85,59 @@ public final class PeriodicTerrain {
         || noise(x, y, z, Math.max(4, size / 80), 42, 23) > .52;
   }
 
+  /** Exact same cave noise, factoring the fixed horizontal interpolation out of every Y sample. */
+  public CaveColumn caves(int x, int z, int surface) {
+    return new CaveColumn(x, z, surface);
+  }
+
+  public final class CaveColumn {
+    private final int surface;
+    private final VerticalNoise a, b, rooms;
+
+    private CaveColumn(int x, int z, int surface) {
+      this.surface = surface;
+      int cells = Math.max(8, size / 32);
+      a = new VerticalNoise(x, z, cells, 30, 21, surface);
+      b = new VerticalNoise(x, z, cells, 30, 22, surface);
+      rooms = new VerticalNoise(x, z, Math.max(4, size / 80), 42, 23, surface);
+    }
+
+    public boolean cave(int y) {
+      if (y > surface - 5 || y < -490) return false;
+      return (Math.abs(a.sample(y)) < .13 && Math.abs(b.sample(y)) < .13)
+          || rooms.sample(y) > .52;
+    }
+  }
+
+  private final class VerticalNoise {
+    private final double scale;
+    private final int first;
+    private final double[] slices;
+
+    VerticalNoise(int x, int z, int cells, double scale, long salt, int surface) {
+      this.scale = scale;
+      first = (int) Math.floor(-490 / scale);
+      int last = (int) Math.floor((surface - 5) / scale) + 1;
+      slices = new double[Math.max(2, last - first + 1)];
+      double u = PeriodicMath.wrap((double) x, size) * cells / size;
+      double w = PeriodicMath.wrap((double) z, size) * cells / size;
+      int ix = (int) Math.floor(u), iz = (int) Math.floor(w);
+      double tx = fade(u - ix), tz = fade(w - iz);
+      for (int i = 0; i < slices.length; i++) {
+        int iy = first + i;
+        slices[i] = lerp(
+            lerp(value(ix, iy, iz, cells, salt), value(ix + 1, iy, iz, cells, salt), tx),
+            lerp(value(ix, iy, iz + 1, cells, salt), value(ix + 1, iy, iz + 1, cells, salt), tx), tz);
+      }
+    }
+
+    double sample(int y) {
+      double v = y / scale;
+      int iy = (int) Math.floor(v);
+      return lerp(slices[iy - first], slices[iy - first + 1], fade(v - iy));
+    }
+  }
+
   public int biome(int x, int z) {
     if (surface(x, z) < 60) return 0; // ocean
     double temperature = climate(x, z, 31), humidity = climate(x, z, 32);

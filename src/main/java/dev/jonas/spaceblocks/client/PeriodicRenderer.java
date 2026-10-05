@@ -3,6 +3,10 @@ package dev.jonas.spaceblocks.client;
 import com.mojang.blaze3d.vertex.*;
 import dev.jonas.spaceblocks.*;
 import java.util.*;
+import java.util.concurrent.*;
+import net.minecraft.client.renderer.chunk.RenderChunkRegion;
+import net.minecraft.client.renderer.chunk.RenderRegionCache;
+import net.minecraft.core.SectionPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -37,6 +41,25 @@ public final class PeriodicRenderer {
   }
 
   private static final LinkedHashMap<BlockPos, Mesh> meshes = new LinkedHashMap<>(256, .75f, true);
+  private static final ExecutorService workers = Executors.newFixedThreadPool(2, task -> {
+    var thread = new Thread(task, "SpaceBlocks-mesh");
+    thread.setDaemon(true);
+    return thread;
+  });
+  private record Job(long epoch) {}
+  private record Built(MeshData[] data, ByteBufferBuilder[] memory,
+      MeshData.SortState translucent) implements AutoCloseable {
+    public void close() {
+      for (var mesh : data) if (mesh != null) mesh.close();
+      for (var buffer : memory) if (buffer != null) buffer.close();
+    }
+  }
+  private static final Map<BlockPos, Job> jobs = new HashMap<>();
+  private static final Set<BlockPos> visibleSections = new HashSet<>();
+  private static long epoch;
+  private static int inFlight;
+  public static int pendingSections;
+
   private static final Set<BlockPos> dirty = new HashSet<>();
   private static final List<ChunkPos> visibleChunks = new ArrayList<>();
   private static Object world;
@@ -46,6 +69,9 @@ public final class PeriodicRenderer {
   public static void clear() {
     for (var m : meshes.values()) for (var b : m.layers) if (b != null) b.close();
     meshes.clear();
+    epoch++;
+    jobs.clear();
+    visibleSections.clear();
     dirty.clear();
     visibleChunks.clear();
     compiled = drawn = 0;
@@ -58,7 +84,15 @@ public final class PeriodicRenderer {
   }
 
   public static void chunkChanged(int x, int z) {
-    for (var p : meshes.keySet()) if (p.getX() >> 4 == x && p.getZ() >> 4 == z) dirty.add(p);
+    var d = PlanetClient.planet();
+    if (d == null) return;
+    // Neighbor arrival changes boundary faces and AO, including sections being built.
+    for (var p : meshes.keySet())
+      if (Math.abs(PeriodicMath.wrap((p.getX() >> 4) - x, d.size() / 16)) <= 1
+          && Math.abs(PeriodicMath.wrap((p.getZ() >> 4) - z, d.size() / 16)) <= 1) dirty.add(p);
+    for (var p : jobs.keySet())
+      if (Math.abs(PeriodicMath.wrap((p.getX() >> 4) - x, d.size() / 16)) <= 1
+          && Math.abs(PeriodicMath.wrap((p.getZ() >> 4) - z, d.size() / 16)) <= 1) dirty.add(p);
   }
 
   public static void frame(RenderFrameEvent.Post event) {
@@ -78,7 +112,12 @@ public final class PeriodicRenderer {
     int range = Math.min(mc.options.getEffectiveRenderDistance(), d.size() / 32);
     Set<Long> unique = new HashSet<>();
     visibleChunks.clear();
+    visibleSections.clear();
     var pending = new ArrayList<BlockPos>();
+    var surfaceSections = new HashSet<BlockPos>();
+    boolean aboveSurface = eye.y >= mc.level.getHeight(
+        net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+        (int) Math.floor(eye.x), (int) Math.floor(eye.z)) - 16;
     int cx = (int) Math.floor(eye.x) >> 4, cz = (int) Math.floor(eye.z) >> 4;
     for (int x = -range; x <= range; x++)
       for (int z = -range; z <= range; z++) {
@@ -87,7 +126,7 @@ public final class PeriodicRenderer {
         var offset =
             PeriodicMath.nearest(p.getMinBlockX(), p.getMinBlockZ(), eye.x, eye.z, d.size());
         if (Math.hypot(p.getMinBlockX() + offset.x() - eye.x, p.getMinBlockZ() + offset.z() - eye.z)
-            > d.size() / 4.0) continue;
+            > Math.min(d.size() / 4.0, range * 16.0 + 16)) continue;
         var chunk = mc.level.getChunkSource().getChunk(p.x, p.z, ChunkStatus.FULL, false);
         if (chunk == null || chunk instanceof EmptyLevelChunk) continue;
         visibleChunks.add(p);
@@ -100,39 +139,87 @@ public final class PeriodicRenderer {
             continue;
           }
           if (SpaceBlocks.clientSettings.fallthrough && y + 16 < d.bottom()) continue;
-          if (!meshes.containsKey(origin) || dirty.contains(origin)) pending.add(origin);
+          // Match the normal vertical view budget instead of compiling the entire 1536-block column.
+          if (Math.abs(y + 8 - eye.y) > range * 16.0 + 16) continue;
+          visibleSections.add(origin);
+          if (aboveSurface && y + 16 >= chunk.getHeight(
+              net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8) - 32)
+            surfaceSections.add(origin);
+          if ((!meshes.containsKey(origin) || dirty.contains(origin)) && !jobs.containsKey(origin))
+            pending.add(origin);
         }
       }
     pending.sort(
-        Comparator.comparingDouble(
+        Comparator.<BlockPos>comparingInt(p -> surfaceSections.contains(p) ? 0 : 1)
+            .thenComparingDouble(
             p -> {
               var delta = d.delta(eye, Vec3.atCenterOf(p.offset(8, 8, 8)));
               return delta.lengthSqr();
             }));
-    long deadline = System.nanoTime() + 8_000_000;
-    for (int i = 0; i < Math.min(4, pending.size()); i++) {
-      compile(pending.get(i));
+    pendingSections = pending.size() + jobs.size();
+    var regions = new RenderRegionCache();
+    long deadline = System.nanoTime() + 2_000_000;
+    for (var origin : pending) {
+      if (inFlight >= 4) break;
+      var region = regions.createRegion(mc.level, SectionPos.of(origin));
+      if (region == null) continue;
+      var job = new Job(epoch);
+      jobs.put(origin, job);
+      dirty.remove(origin);
+      inFlight++;
+      CompletableFuture.supplyAsync(() -> compile(origin, region), workers)
+          .whenComplete((built, error) -> mc.execute(() -> {
+            inFlight--;
+            jobs.remove(origin, job);
+            if (error != null) {
+              dirty.add(origin);
+              SpaceBlocks.LOGGER.error("Periodic section meshing failed at {}", origin, error);
+              return;
+            }
+            try {
+              if (job.epoch == epoch && visibleSections.contains(origin)) upload(origin, built);
+            } finally { built.close(); }
+          }));
       if (System.nanoTime() > deadline) break;
     }
-    while (meshes.size() > 2048) {
-      var it = meshes.entrySet().iterator();
-      var old = it.next().getValue();
-      it.remove();
-      for (var b : old.layers) if (b != null) b.close();
+    // Never evict a wanted section to admit another wanted section. The old fixed 2048 limit
+    // caused perpetual rebuilds and missing terrain with large natural-world view distances.
+    for (var iterator = meshes.entrySet().iterator(); iterator.hasNext();) {
+      var entry = iterator.next();
+      if (!visibleSections.contains(entry.getKey())) {
+        for (var buffer : entry.getValue().layers) if (buffer != null) buffer.close();
+        dirty.remove(entry.getKey());
+        iterator.remove();
+      }
     }
   }
 
-  private static void compile(BlockPos origin) {
+  public static boolean ready(BlockPos origin) { return meshes.containsKey(origin); }
+  public static int cachedSections() { return meshes.size(); }
+
+  private static void upload(BlockPos origin, Built built) {
+    var result = new VertexBuffer[4];
+    for (int i = 0; i < 4; i++) {
+      var data = built.data[i];
+      if (data == null) continue;
+      result[i] = new VertexBuffer(VertexBuffer.Usage.STATIC);
+      result[i].bind();
+      result[i].upload(data);
+      built.data[i] = null; // upload owns/closes MeshData
+    }
+    VertexBuffer.unbind();
+    var old = meshes.put(origin, new Mesh(origin, result, built.translucent));
+    if (old != null) for (var buffer : old.layers) if (buffer != null) buffer.close();
+    compiled++;
+  }
+
+  private static Built compile(BlockPos origin, RenderChunkRegion region) {
     var mc = Minecraft.getInstance();
-    var chunk =
-        mc.level
-            .getChunkSource()
-            .getChunk(origin.getX() >> 4, origin.getZ() >> 4, ChunkStatus.FULL, false);
-    if (chunk == null) return;
     var memory = new ByteBufferBuilder[4];
     var builders = new BufferBuilder[4];
-    var result = new VertexBuffer[4];
+    var dataMeshes = new MeshData[4];
     MeshData.SortState translucent = null;
+    boolean success = false;
     try {
       for (int i = 0; i < 4; i++) {
         memory[i] = new ByteBufferBuilder(65536);
@@ -143,14 +230,28 @@ public final class PeriodicRenderer {
       var random = RandomSource.create(0);
       var dispatcher = mc.getBlockRenderer();
       var p = new BlockPos.MutableBlockPos();
+      var neighbor = new BlockPos.MutableBlockPos();
+      net.minecraft.client.renderer.block.ModelBlockRenderer.enableCaching();
       for (int y = 0; y < 16; y++)
         for (int z = 0; z < 16; z++)
           for (int x = 0; x < 16; x++) {
             p.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
-            var state = chunk.getBlockState(p);
+            var state = region.getBlockState(p);
+            // A fully enclosed opaque cube has no emitted faces. Avoid model/layer/AO work.
+            if (state.getFluidState().isEmpty() && state.isSolidRender(region, p)) {
+              boolean enclosed = true;
+              for (var face : net.minecraft.core.Direction.values()) {
+                neighbor.setWithOffset(p, face);
+                if (!region.getBlockState(neighbor).isSolidRender(region, neighbor)) {
+                  enclosed = false;
+                  break;
+                }
+              }
+              if (enclosed) continue;
+            }
             if (state.getRenderShape() == RenderShape.MODEL) {
               random.setSeed(state.getSeed(p));
-              var data = chunk.getModelData(p);
+              var data = region.getModelData(p);
               if (data == null) data = ModelData.EMPTY;
               for (var type : dispatcher.getBlockModel(state).getRenderTypes(state, random, data)) {
                 int layer = PlanetShaders.layer(type);
@@ -158,28 +259,27 @@ public final class PeriodicRenderer {
                 pose.pushPose();
                 pose.translate(x, y, z);
                 dispatcher.renderBatched(
-                    state, p, mc.level, pose, builders[layer], true, random, data, type);
+                    state, p, region, pose, builders[layer], true, random, data, type);
                 pose.popPose();
               }
             }
             var fluid = state.getFluidState();
-            if (!fluid.isEmpty()) dispatcher.renderLiquid(p, mc.level, builders[3], state, fluid);
+            if (!fluid.isEmpty()) dispatcher.renderLiquid(p, region, builders[3], state, fluid);
           }
       for (int i = 0; i < 4; i++) {
         var mesh = builders[i].build();
         if (mesh == null) continue;
         if (i == 3) translucent = mesh.sortQuads(memory[i], VertexSorting.DISTANCE_TO_ORIGIN);
-        result[i] = new VertexBuffer(VertexBuffer.Usage.STATIC);
-        result[i].bind();
-        result[i].upload(mesh);
+        dataMeshes[i] = mesh;
       }
-      VertexBuffer.unbind();
-      var old = meshes.put(origin, new Mesh(origin, result, translucent));
-      if (old != null) for (var b : old.layers) if (b != null) b.close();
-      dirty.remove(origin);
-      compiled++;
+      success = true;
+      return new Built(dataMeshes, memory, translucent);
     } finally {
-      for (var m : memory) if (m != null) m.close();
+      net.minecraft.client.renderer.block.ModelBlockRenderer.clearCache();
+      if (!success) {
+        for (var mesh : dataMeshes) if (mesh != null) mesh.close();
+        for (var m : memory) if (m != null) m.close();
+      }
     }
   }
 
@@ -205,6 +305,7 @@ public final class PeriodicRenderer {
                         d, eye, m.origin.getX() + 8, m.origin.getY() + 8, m.origin.getZ() + 8)));
       for (var mesh : ordered) {
         var p = mesh.origin;
+        if (!visibleSections.contains(p)) continue;
         var offset = PeriodicMath.nearest(p.getX(), p.getZ(), eye.x, eye.z, d.size());
         if (Math.hypot(p.getX() + offset.x() - eye.x, p.getZ() + offset.z() - eye.z)
                 > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0)
@@ -262,7 +363,7 @@ public final class PeriodicRenderer {
           var pos = be.getBlockPos();
           var offset = PeriodicMath.nearest(pos.getX(), pos.getZ(), eye.x, eye.z, d.size());
           if (Math.hypot(pos.getX() + offset.x() - eye.x, pos.getZ() + offset.z() - eye.z)
-              > d.size() / 4.0) continue;
+              > Math.min(d.size() / 4.0, mc.options.getEffectiveRenderDistance() * 16.0 + 16)) continue;
           var renderer =
               (BlockEntityRenderer<BlockEntity>)
                   mc.getBlockEntityRenderDispatcher().getRenderer(be);

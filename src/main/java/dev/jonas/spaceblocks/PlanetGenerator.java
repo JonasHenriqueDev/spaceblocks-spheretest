@@ -53,32 +53,37 @@ public final class PlanetGenerator extends ChunkGenerator {
     return natural ? terrain(random).surface(x, z) : Planet.SURFACE;
   }
 
+  private record Tree(int dx, int dz, int kind, int crown) {}
+
+  private List<Tree> trees(int x, int z, PeriodicTerrain noise) {
+    var result = new java.util.ArrayList<Tree>(1);
+    for (int gx = -1; gx <= 1; gx++)
+      for (int gz = -1; gz <= 1; gz++) {
+        int tx = PeriodicMath.wrap(Math.floorDiv(x, 16) * 16 + 8 + gx * 16, planet.size());
+        int tz = PeriodicMath.wrap(Math.floorDiv(z, 16) * 16 + 8 + gz * 16, planet.size());
+        int dx = Math.abs(PeriodicMath.wrap(x - tx, planet.size()));
+        int dz = Math.abs(PeriodicMath.wrap(z - tz, planet.size()));
+        if (dx > 2 || dz > 2) continue;
+        long hash = PeriodicTerrain.hash(0, tx, 0, tz);
+        int kind = noise.biome(tx, tz), base = noise.surface(tx, tz);
+        if ((kind == 2 || kind == 4) && (hash & 3) != 0 && base >= 66)
+          result.add(new Tree(dx, dz, kind, base + 5));
+      }
+    return result;
+  }
+
   private BlockState naturalBlock(
-      int x, int y, int z, int height, PeriodicTerrain noise, int biome) {
+      int x, int y, int z, int height, PeriodicTerrain.CaveColumn caves, int biome, List<Tree> trees) {
     if (y <= -496) return (y >= -500 ? Blocks.BEDROCK : Blocks.AIR).defaultBlockState();
     if (y > height) {
       if (y <= 64) return (biome == 5 && y == 64 ? Blocks.ICE : Blocks.WATER).defaultBlockState();
-      int cell = 16;
-      // Evaluate neighboring tree roots, including roots across either connected edge.
-      for (int gx = -1; gx <= 1; gx++)
-        for (int gz = -1; gz <= 1; gz++) {
-          int tx = PeriodicMath.wrap(Math.floorDiv(x, cell) * cell + 8 + gx * cell, planet.size());
-          int tz = PeriodicMath.wrap(Math.floorDiv(z, cell) * cell + 8 + gz * cell, planet.size());
-          long hash = PeriodicTerrain.hash(0, tx, 0, tz);
-          int kind = noise.biome(tx, tz), base = noise.surface(tx, tz);
-          if ((kind != 2 && kind != 4) || (hash & 3) == 0 || base < 66) continue;
-          int dx = Math.abs(PeriodicMath.wrap(x - tx, planet.size())),
-              dz = Math.abs(PeriodicMath.wrap(z - tz, planet.size()));
-          int crown = base + 5;
-          if (dx == 0 && dz == 0 && y <= crown)
-            return (kind == 4 ? Blocks.SPRUCE_LOG : Blocks.OAK_LOG).defaultBlockState();
-          if (dx <= 2
-              && dz <= 2
-              && y >= crown - 2
-              && y <= crown + 1
-              && dx + dz + Math.abs(y - crown) <= 5)
-            return (kind == 4 ? Blocks.SPRUCE_LEAVES : Blocks.OAK_LEAVES).defaultBlockState();
-        }
+      for (var tree : trees) {
+        if (tree.dx == 0 && tree.dz == 0 && y <= tree.crown)
+          return (tree.kind == 4 ? Blocks.SPRUCE_LOG : Blocks.OAK_LOG).defaultBlockState();
+        if (y >= tree.crown - 2 && y <= tree.crown + 1
+            && tree.dx + tree.dz + Math.abs(y - tree.crown) <= 5)
+          return (tree.kind == 4 ? Blocks.SPRUCE_LEAVES : Blocks.OAK_LEAVES).defaultBlockState();
+      }
       if (y == height + 1 && height > 65 && biome == 5) return Blocks.SNOW.defaultBlockState();
       if (y == height + 1
           && height > 65
@@ -88,7 +93,7 @@ public final class PlanetGenerator extends ChunkGenerator {
             .defaultBlockState();
       return Blocks.AIR.defaultBlockState();
     }
-    if (noise.cave(x, y, z, height))
+    if (caves.cave(y))
       return (y < -450 ? Blocks.LAVA : Blocks.AIR).defaultBlockState();
     if (y == height)
       return (height <= 65 || biome == 3
@@ -187,8 +192,15 @@ public final class PlanetGenerator extends ChunkGenerator {
   public CompletableFuture<ChunkAccess> fillFromNoise(
       Blender b, RandomState r, StructureManager s, ChunkAccess c) {
     if (!planet.contains(c.getPos())) return CompletableFuture.completedFuture(c);
+    return CompletableFuture.supplyAsync(net.minecraft.Util.wrapThreadWithTaskName("periodic_terrain", () -> {
+      for (var section : c.getSections()) section.acquire();
+      try { return fill(r, c); }
+      finally { for (var section : c.getSections()) section.release(); }
+    }), net.minecraft.Util.backgroundExecutor());
+  }
+
+  private ChunkAccess fill(RandomState r, ChunkAccess c) {
     var noise = natural ? terrain(r) : null;
-    var pos = new BlockPos.MutableBlockPos();
     var floor = c.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
     var top = c.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
     for (int x = 0; x < 16; x++)
@@ -196,6 +208,8 @@ public final class PlanetGenerator extends ChunkGenerator {
         int wx = c.getPos().getMinBlockX() + x, wz = c.getPos().getMinBlockZ() + z;
         int height = natural ? noise.surface(wx, wz) : Planet.SURFACE,
             biome = natural ? noise.biome(wx, wz) : 1;
+        var caves = natural ? noise.caves(wx, wz, height) : null;
+        var trees = natural ? trees(wx, wz, noise) : List.<Tree>of();
         var structures =
             natural
                 ? PeriodicStructures.columns(wx, wz, planet.size(), noise)
@@ -213,7 +227,7 @@ public final class PlanetGenerator extends ChunkGenerator {
                               Math.floorDiv(wz, 16) * 16 + 8 + dz)
                           + 7);
         for (int y = natural ? -500 : planet.bottom() + 1; y <= ceiling; y++) {
-          var state = natural ? naturalBlock(wx, y, wz, height, noise, biome) : block(y);
+          var state = natural ? naturalBlock(wx, y, wz, height, caves, biome, trees) : block(y);
           long lootSeed = 0;
           for (var structure : structures) {
             var placed = structure.block(y);
@@ -223,10 +237,7 @@ public final class PlanetGenerator extends ChunkGenerator {
             }
           }
           if (state.isAir()) continue;
-          c.setBlockState(
-              pos.set(c.getPos().getMinBlockX() + x, y, c.getPos().getMinBlockZ() + z),
-              state,
-              false);
+          c.getSection(c.getSectionIndex(y)).setBlockState(x, y & 15, z, state, false);
           if (natural && (state.is(Blocks.CHEST) || state.is(Blocks.SPAWNER))) {
             var tag = new net.minecraft.nbt.CompoundTag();
             tag.putString(
@@ -250,7 +261,7 @@ public final class PlanetGenerator extends ChunkGenerator {
           top.update(x, y, z, state);
         }
       }
-    return CompletableFuture.completedFuture(c);
+    return c;
   }
 
   @Override
@@ -264,10 +275,12 @@ public final class PlanetGenerator extends ChunkGenerator {
   public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor l, RandomState r) {
     var states = new BlockState[l.getHeight()];
     int height = surface(x, z, r), biome = natural ? terrain(r).biome(x, z) : 1;
+    var caves = natural ? terrain(r).caves(x, z, height) : null;
+    var trees = natural ? trees(x, z, terrain(r)) : List.<Tree>of();
     for (int i = 0; i < states.length; i++)
       states[i] =
           natural
-              ? naturalBlock(x, l.getMinBuildHeight() + i, z, height, terrain(r), biome)
+              ? naturalBlock(x, l.getMinBuildHeight() + i, z, height, caves, biome, trees)
               : block(l.getMinBuildHeight() + i);
     return new NoiseColumn(l.getMinBuildHeight(), states);
   }

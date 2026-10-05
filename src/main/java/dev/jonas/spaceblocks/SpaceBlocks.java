@@ -43,7 +43,7 @@ public final class SpaceBlocks {
     NeoForge.EVENT_BUS.addListener(PlanetTests::started);
     NeoForge.EVENT_BUS.addListener(PlanetNetworkTests::joined);
     LOGGER.info(
-        "Space Blocks 0.7.0: Jeija/Spheretest periodic terrain and camera-relative exponential"
+        "Space Blocks 0.7.1: Jeija/Spheretest periodic terrain and camera-relative exponential"
             + " projection");
   }
 

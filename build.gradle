@@ -35,6 +35,12 @@ neoForge {
             programArgument '--nogui'
             systemProperty 'spaceblocks.testServer', 'true'
         }
+        periodicPerformanceClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-performance')
+            programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '720'
+            systemProperty 'spaceblocks.testClient', 'true'
+            systemProperty 'spaceblocks.performanceClient', 'true'
+        }
         periodicNetworkServer {
             server(); loadedMods = []; gameDirectory = project.file('run-network-server')
             programArgument '--nogui'

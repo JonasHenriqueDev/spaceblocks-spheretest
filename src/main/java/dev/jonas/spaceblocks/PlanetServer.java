@@ -119,6 +119,13 @@ public final class PlanetServer {
       var d = Planet.of(level);
       if (d == null) continue;
       Set<Long> wanted = new HashSet<>();
+      var active = TICKETS.computeIfAbsent(level, k -> new HashSet<>());
+      int generating = 0;
+      for (long key : active) {
+        var c = new ChunkPos(key);
+        if (level.getChunkSource().getChunkNow(c.x, c.z) == null) generating++;
+      }
+      int requests = 4;
       for (var player : level.players()) {
         wrap(player);
         if (player.tickCount % 20 == 0) PlanetNetwork.sync(player);
@@ -154,7 +161,13 @@ public final class PlanetServer {
         for (long key : queue) {
           if (sent.contains(key)) continue;
           var c = new ChunkPos(key);
-          level.getChunkSource().addRegionTicket(PERIODIC, c, 2, c, true);
+          if (!active.contains(key)) {
+            if (requests == 0 || generating >= 16) continue;
+            level.getChunkSource().addRegionTicket(PERIODIC, c, 2, c, true);
+            active.add(key);
+            requests--;
+            generating++;
+          }
           var chunk = level.getChunkSource().getChunkNow(c.x, c.z);
           // Tickets schedule generation. Never wait for a new terrain chunk on the server tick.
           if (chunk == null) continue;
@@ -164,18 +177,14 @@ public final class PlanetServer {
           if (--budget == 0) break;
         }
       }
-      var previous = TICKETS.computeIfAbsent(level, k -> new HashSet<>());
-      for (long key : wanted)
-        if (!previous.contains(key)) {
-          var c = new ChunkPos(key);
-          level.getChunkSource().addRegionTicket(PERIODIC, c, 2, c, true);
-        }
-      for (long key : previous)
+      for (var iterator = active.iterator(); iterator.hasNext();) {
+        long key = iterator.next();
         if (!wanted.contains(key)) {
           var c = new ChunkPos(key);
           level.getChunkSource().removeRegionTicket(PERIODIC, c, 2, c, true);
+          iterator.remove();
         }
-      TICKETS.put(level, wanted);
+      }
       // Relocation can change the visible-entity index. Iterate a stable snapshot.
       var entities = new ArrayList<Entity>();
       for (var entity : level.getAllEntities()) if (entity != null) entities.add(entity);

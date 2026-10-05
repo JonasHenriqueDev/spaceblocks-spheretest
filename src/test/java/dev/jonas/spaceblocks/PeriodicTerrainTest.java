@@ -53,6 +53,20 @@ class PeriodicTerrainTest {
   }
 
   @Test
+  void optimizedCavesMatchOriginalEveryAltitudeIncludingSeams() {
+    var n = new PeriodicTerrain(1632, 94815);
+    var random = new Random(821);
+    for (int i = 0; i < 128; i++) {
+      int x = i < 8 ? 816 - i : random.nextInt(3264) - 1632;
+      int z = random.nextInt(3264) - 1632;
+      int surface = n.surface(x, z);
+      var column = n.caves(x, z, surface);
+      for (int y = -512; y <= surface + 20; y++)
+        assertEquals(n.cave(x, y, z, surface), column.cave(y), "Y=" + y);
+    }
+  }
+
+  @Test
   void worldSeedsChangeTerrain() {
     assertNotEquals(
         new PeriodicTerrain(1632, 1).surface(100, 100),
