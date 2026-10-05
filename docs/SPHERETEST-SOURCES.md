@@ -1,0 +1,40 @@
+# Spheretest source audit
+
+Upstream: https://github.com/Jeija/spheretest
+Revision examined: 719bd6bf (master, including merged Minetest history).
+Transcription supplied by the user was read; YouTube pages were inaccessible through the browsing tool. No claim to have watched the videos.
+
+- `client/shaders/nodes_shader/opengl_vertex.glsl`: active PLANET_KEEP_SCALE is R exp(deltaY/R), angle horizontalDistance/R; imaginary component supplies X/Z, real component minus R supplies Y, all camera relative.
+- `object_shader`: same vertex formula in world space, transformed back by inverse model matrix. World objects (including held objects in other players' hands) are projected.
+- `selection_shader`: same formula for selection outlines.
+- `wielded_hand_shader`: first-person hand remains unprojected. `wielded_shader` is for world items.
+- Water: node shader transforms the terrain before optional waving-water offsets. Minecraft fluid meshes use the terrain vertex projection, without inventing Minetest water waves.
+- `src/clientmap.cpp`: nine candidate translations, choose closest per chunk; no flat frustum/occlusion culling; exclude horizontal distance greater than circumference/4 and sections below -radius.
+- `src/clientiface.cpp`: requests canonical wrapped chunk addresses.
+- `src/collision.cpp`: wrapped node lookup while retaining unwrapped physical collision boxes.
+- `src/environment.cpp`: wrapped activation and entity visibility; altitude-dependent gravity and centrifugal term.
+- `src/content_cao.cpp`: nearest of nine offsets for objects.
+- `src/content_sao.cpp` and `src/game.cpp`: horizontal wrap, bottom at -radius, shift X by half circumference, reset Y to -radius+1, invert vertical velocity.
+- `src/mapblock_mesh.cpp`: translate existing source mesh rather than change block storage; suppress duplicate faces on small planets.
+- `src/defaultsettings.cpp`: keep_scale=true, centrifugal=true, realistic_gravity=false, fallthrough=true.
+
+## Historical commits inspected
+
+- 50f8a372: initial sphere shader.
+- 55de24a6: keep-scale option.
+- 5b209c77: wrapped chunk transmission and collisions.
+- c754fed9fafea63d9ef32cf499f9a3c797e49aa4: complex exponential correction.
+- 529455f4: fall through the bottom.
+- dd68d762161ce9064bbb758d7a2454b0cead76c1: world objects versus hand rendering.
+- 38bcb295e9176570369a4e966dd1736c9095e76d: object activation/visibility across edges.
+- 493c6bc3: gravity with keep-scale.
+- 96adb16b: experimental block-width correction, later reverted.
+- d973e4b40dc0da723921563ff2093e105c345892: retain flat movement speed and flat speed in centrifugal term.
+
+## Units and adaptation
+
+Original BS=10 internal units per node is omitted: Minecraft block=one node. R=planet_radius*16; circumference=ceil((R/16)*pi)*32. Surface Y=64 is the translated sea-level origin for physical altitude. Active shader uses vertex Y minus camera Y, not altitude above sea level.
+
+Original centrifugal update has a factor of 2 (`speed.Y += v_horizontal^2/height * dt * 2`). In blocks/tick units this is 2*v_tick^2/height per tick. Base gravity retains Minecraft's per-entity default; variable coefficient is exp(h/R) below surface and exp(-2h/R) above it. Liquid and climbing retain Minecraft behavior. No visual-speed compensation is present.
+
+Algorithms and shader projection adapted under LGPL-2.1-or-later; original contributors credited. Minecraft models/textures/shader includes come from the running game, not copied assets. All new source is provided under LGPL-2.1-or-later; MDK license retained in TEMPLATE_LICENSE.txt.
