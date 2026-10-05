@@ -24,10 +24,11 @@ class PlanetAtlasTest {
   @Test
   void cameraViewUsesOriginalExponentialProjectionAndPeriodicAlias() {
     var a = AtlasGeometry.spheretest(23, -17, 95, 0, 0, 256, 1632);
-    var b = PeriodicMath.project(23, 31, -17, 256);
-    assertEquals(b.x() / 256, a.x(), 1e-12);
-    assertEquals((b.y() + 256) / 256, a.y(), 1e-12);
-    assertEquals(b.z() / 256, a.z(), 1e-12);
+    double r = 1632 / (2.0 * Math.PI);
+    var b = PeriodicMath.project(23, 31, -17, r);
+    assertEquals(b.x() / r, a.x(), 1e-12);
+    assertEquals((b.y() + r) / r, a.y(), 1e-12);
+    assertEquals(b.z() / r, a.z(), 1e-12);
     assertEquals(a, AtlasGeometry.spheretest(23 + 1632, -17 - 1632, 95, 0, 0, 256, 1632));
   }
 

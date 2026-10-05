@@ -11,7 +11,13 @@ import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(value = SpaceBlocks.MOD_ID, dist = Dist.CLIENT)
 public final class SpaceBlocksClient {
-  public SpaceBlocksClient(IEventBus bus) {
+  public SpaceBlocksClient(IEventBus bus, net.neoforged.fml.ModContainer container) {
+    container.registerExtensionPoint(
+        net.neoforged.neoforge.client.gui.IConfigScreenFactory.class,
+        (mod, parent) -> new PlanetHudScreen(parent));
+    NeoForge.EVENT_BUS.addListener(PlanetHud::render);
+    NeoForge.EVENT_BUS.addListener(PlanetHud::camera);
+    NeoForge.EVENT_BUS.addListener(PlanetHud::commands);
     bus.addListener(
         (RegisterShadersEvent e) -> {
           try {

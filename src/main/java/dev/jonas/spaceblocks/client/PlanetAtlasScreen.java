@@ -58,6 +58,7 @@ public final class PlanetAtlasScreen extends Screen {
   }
 
   public static void receive(PlanetAtlas.Snapshot data) {
+    PlanetHud.receive(data);
     var mc = Minecraft.getInstance();
     if (mc.level == null || !mc.level.dimension().location().toString().equals(data.dimension()))
       return;
@@ -373,7 +374,17 @@ public final class PlanetAtlasScreen extends Screen {
     g.drawString(font, data.dimension().replace("spaceblocks:", ""), x, y + 16, 0x91AED0, false);
     g.drawString(
         font, "Map: " + data.size() + " x " + data.size() + " blocks", x, y + 36, 0xFFFFFF, false);
-    g.drawString(font, "Projection radius: " + data.radius(), x, y + 50, 0xFFFFFF, false);
+    g.drawString(
+        font,
+        String.format(
+            java.util.Locale.ROOT,
+            "Radius: %.2f (requested %d)",
+            data.size() / (2.0 * Math.PI),
+            data.radius()),
+        x,
+        y + 50,
+        0xFFFFFF,
+        false);
     g.drawString(font, "Bottom: Y=" + data.bottom(), x, y + 64, 0xFFFFFF, false);
     g.drawString(
         font,

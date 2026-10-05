@@ -16,6 +16,7 @@ public final class PlanetClient {
   public static void restoreVelocity(PlanetNetwork.Velocity packet) {
     var player = Minecraft.getInstance().player;
     if (player == null) return;
+    if (packet.bounce()) PlanetHud.crossed();
     var v = beforeTeleport;
     beforeTeleport = null;
     player.setDeltaMovement(
@@ -41,7 +42,7 @@ public final class PlanetClient {
     double reach = Math.max(blockReach, entityReach);
     for (double t = .05; t <= reach + .049; t += .05) {
       var v = direction.scale(Math.min(t, reach));
-      var p = PeriodicMath.unproject(v.x, v.y, v.z, d.radius());
+      var p = PeriodicMath.unproject(v.x, v.y, v.z, d.projectionRadius());
       var point = eye.add(p.x(), p.y(), p.z());
       var block = clip(entity, previous, point, false);
       double best =
@@ -86,7 +87,7 @@ public final class PlanetClient {
   public static Vec3 project(Vec3 world, Vec3 eye) {
     var d = planet();
     var flat = BottomPassage.nearest(Minecraft.getInstance().level, eye, world).subtract(eye);
-    var p = PeriodicMath.project(flat.x, flat.y, flat.z, d.radius());
+    var p = PeriodicMath.project(flat.x, flat.y, flat.z, d.projectionRadius());
     return new Vec3(p.x(), p.y(), p.z());
   }
 
@@ -97,7 +98,7 @@ public final class PlanetClient {
     var d = planet();
     for (double t = .1; t <= reach + .099; t += .1) {
       var v = direction.scale(Math.min(t, reach));
-      var p = PeriodicMath.unproject(v.x, v.y, v.z, d.radius());
+      var p = PeriodicMath.unproject(v.x, v.y, v.z, d.projectionRadius());
       var point = eye.add(p.x(), p.y(), p.z());
       if (point.distanceToSqr(eye) > reach * reach)
         point = eye.add(point.subtract(eye).normalize().scale(reach));

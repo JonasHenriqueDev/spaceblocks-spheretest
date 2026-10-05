@@ -16,8 +16,11 @@ public final class AtlasGeometry {
   public static Point spheretest(
       double x, double z, double height, double cameraX, double cameraZ, int radius, int size) {
     double dx = PeriodicMath.wrap(x - cameraX, size), dz = PeriodicMath.wrap(z - cameraZ, size);
-    var p = PeriodicMath.project(dx, height - Planet.SURFACE, dz, radius);
-    return new Point(p.x() / radius, (p.y() + radius) / radius, p.z() / radius);
+    var p = PeriodicMath.project(dx, height - Planet.SURFACE, dz, size / (2.0 * Math.PI));
+    return new Point(
+        p.x() / (size / (2.0 * Math.PI)),
+        (p.y() + size / (2.0 * Math.PI)) / (size / (2.0 * Math.PI)),
+        p.z() / (size / (2.0 * Math.PI)));
   }
 
   public static Point rotate(Point p, double yaw, double pitch) {

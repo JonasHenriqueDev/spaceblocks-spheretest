@@ -358,7 +358,7 @@ public final class PeriodicRenderer {
       bottomDrawn = 0;
     }
     type.setupRenderState();
-    shader.getUniform("PlanetRadius").set((float) d.radius());
+    shader.getUniform("PlanetRadius").set((float) d.projectionRadius());
     shader.getUniform("Eye").set((float) eye.x, (float) eye.y, (float) eye.z);
     shader.getUniform("BottomY").set((float) d.bottom());
     int localLight = LevelRenderer.getLightColor(mc.level, BlockPos.containing(eye));
@@ -441,7 +441,7 @@ public final class PeriodicRenderer {
   private static double projectedDistance(
       Planet d, Vec3 eye, double x, double y, double z, boolean mirrored) {
     var flat = d.delta(eye, new Vec3(x, y, z));
-    var q = PeriodicMath.project(flat.x, mirrored ? -flat.y : flat.y, flat.z, d.radius());
+    var q = PeriodicMath.project(flat.x, mirrored ? -flat.y : flat.y, flat.z, d.projectionRadius());
     return q.x() * q.x() + q.y() * q.y() + q.z() * q.z();
   }
 
@@ -473,7 +473,9 @@ public final class PeriodicRenderer {
           pose.translate(
               pos.getX() + offset.x() - eye.x, pos.getY() - eye.y, pos.getZ() + offset.z() - eye.z);
           MultiBufferSource projected =
-              type -> new ProjectedConsumer(buffers.getBuffer(type), new Matrix4f(), d.radius());
+              type ->
+                  new ProjectedConsumer(
+                      buffers.getBuffer(type), new Matrix4f(), d.projectionRadius());
           renderer.render(
               be,
               e.getPartialTick().getGameTimeDeltaPartialTick(false),

@@ -55,7 +55,7 @@ public final class PlanetBottomClientTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.1.jar"),
+                .contains("spaceblocks-0.8.2.jar"),
             "Final packaged bottom-passage JAR loaded");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);

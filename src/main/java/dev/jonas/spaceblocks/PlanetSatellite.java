@@ -18,7 +18,7 @@ public final class PlanetSatellite {
   private static final TicketType<UUID> TICKET =
       TicketType.create("spaceblocks_satellite", Comparator.<UUID>naturalOrder());
 
-  public static double circularSpeed(double altitude, int radius) {
+  public static double circularSpeed(double altitude, double radius) {
     return Math.sqrt(
         .08
             * PeriodicMath.gravityCoefficient(altitude, radius)
@@ -36,7 +36,7 @@ public final class PlanetSatellite {
     settings.centrifugal = true;
     settings.setDirty();
     for (var player : p.serverLevel().players()) PlanetNetwork.sync(player);
-    double vx = circularSpeed(altitude, planet.radius()) * multiplier;
+    double vx = circularSpeed(altitude, planet.projectionRadius()) * multiplier;
     var stand = new ArmorStand(p.serverLevel(), p.getX(), Planet.SURFACE + altitude, p.getZ());
     var marker = new net.minecraft.nbt.CompoundTag();
     marker.putBoolean("Marker", true);
@@ -178,10 +178,12 @@ public final class PlanetSatellite {
         double gravity =
             .08
                 * (settings.realisticGravity
-                    ? PeriodicMath.gravityCoefficient(h, planet.radius())
+                    ? PeriodicMath.gravityCoefficient(h, planet.projectionRadius())
                     : 1);
         double centrifugal =
-            settings.centrifugal ? PeriodicMath.centrifugal(vx, 0, h, planet.radius()) : 0;
+            settings.centrifugal
+                ? PeriodicMath.centrifugal(vx, 0, h, planet.projectionRadius())
+                : 0;
         vy += centrifugal - gravity;
         double y = entity.getY() + vy;
         if (settings.fallthrough && y < planet.bottom()) {

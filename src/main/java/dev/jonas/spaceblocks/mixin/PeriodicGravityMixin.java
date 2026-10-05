@@ -21,10 +21,10 @@ abstract class PeriodicGravityMixin {
     var s = PlanetSettings.get(e.level());
     double g = ci.getReturnValue();
     if (s.realisticGravity)
-      g *= PeriodicMath.gravityCoefficient(e.getY() - Planet.SURFACE, d.radius());
+      g *= PeriodicMath.gravityCoefficient(e.getY() - Planet.SURFACE, d.projectionRadius());
     if (s.centrifugal) {
       var v = e.getDeltaMovement();
-      g -= PeriodicMath.centrifugal(v.x, v.z, e.getY() - Planet.SURFACE, d.radius());
+      g -= PeriodicMath.centrifugal(v.x, v.z, e.getY() - Planet.SURFACE, d.projectionRadius());
     }
     ci.setReturnValue(g);
   }

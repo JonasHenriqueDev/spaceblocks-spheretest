@@ -12,6 +12,8 @@ abstract class PeriodicBreakingMixin {
   @ModifyVariable(method = "renderBreakingTexture", at = @At("HEAD"), argsOnly = true)
   private VertexConsumer cracking(VertexConsumer target) {
     var d = PlanetClient.planet();
-    return d == null ? target : new ProjectedConsumer(target, new Matrix4f(), d.radius(), d.size());
+    return d == null
+        ? target
+        : new ProjectedConsumer(target, new Matrix4f(), d.projectionRadius(), d.size());
   }
 }

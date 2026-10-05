@@ -12,14 +12,14 @@ import org.joml.Vector3f;
 public final class ProjectedConsumer implements VertexConsumer {
   private final VertexConsumer target;
   private final Matrix4f inverseView, view;
-  private final int radius;
+  private final double radius;
   private final int period;
 
-  public ProjectedConsumer(VertexConsumer target, Matrix4f view, int radius) {
+  public ProjectedConsumer(VertexConsumer target, Matrix4f view, double radius) {
     this(target, view, radius, 0);
   }
 
-  public ProjectedConsumer(VertexConsumer target, Matrix4f view, int radius, int period) {
+  public ProjectedConsumer(VertexConsumer target, Matrix4f view, double radius, int period) {
     this.target = target;
     this.view = new Matrix4f(view);
     this.inverseView = new Matrix4f(view).invert();

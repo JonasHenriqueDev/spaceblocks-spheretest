@@ -20,13 +20,17 @@ public final class PlanetAtlas {
     0x236BA5, 0x7DAA58, 0x477B44, 0xD6BE7B, 0x527F70, 0xD6E5E8, 0x8B9098
   };
 
-  public record Request() implements CustomPacketPayload {
+  public record Request(boolean hud) implements CustomPacketPayload {
     public static final Type<Request> TYPE =
         new Type<>(
             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
                 SpaceBlocks.MOD_ID, "atlas_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, Request> CODEC =
-        StreamCodec.of((b, p) -> {}, b -> new Request());
+        StreamCodec.of((b, p) -> b.writeBoolean(p.hud), b -> new Request(b.readBoolean()));
+
+    public Request() {
+      this(false);
+    }
 
     public Type<Request> type() {
       return TYPE;
@@ -110,6 +114,21 @@ public final class PlanetAtlas {
     }
   }
 
+  public record HudSnapshot(Snapshot data) implements CustomPacketPayload {
+    public static final Type<HudSnapshot> TYPE = new Type<>(SpaceBlocks.id("hud_atlas"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, HudSnapshot> CODEC =
+        StreamCodec.of(
+            (b, p) -> Snapshot.CODEC.encode(b, p.data),
+            b -> new HudSnapshot(Snapshot.CODEC.decode(b)));
+
+    public Type<HudSnapshot> type() {
+      return TYPE;
+    }
+  }
+
+  private static final Map<ServerPlayer, Boolean> hudRequests = new WeakHashMap<>();
+  private static final Map<ServerPlayer, Snapshot> recent = new WeakHashMap<>();
+
   private static final class Scan {
     final Snapshot data;
     int index;
@@ -129,20 +148,35 @@ public final class PlanetAtlas {
   }
 
   public static void request(ServerPlayer player) {
+    request(player, false);
+  }
+
+  public static void request(ServerPlayer player, boolean hud) {
     var planet = Planet.of(player.level());
     if (planet == null) {
       player.sendSystemMessage(Component.literal("Enter a planet before opening its map."));
       return;
     }
     long tick = player.server.getTickCount();
-    if (forecasts.containsKey(player)
-        || scans.containsKey(player)
-        || tick - requested.getOrDefault(player, -100L) < 40) return;
+    if (forecasts.containsKey(player) || scans.containsKey(player)) {
+      // A manual map request takes precedence over a pending passive HUD refresh.
+      if (!hud) hudRequests.put(player, false);
+      return;
+    }
+    if (tick - requested.getOrDefault(player, -100L) < 40) {
+      var cached = recent.get(player);
+      if (!hud
+          && cached != null
+          && cached.dimension.equals(player.level().dimension().location().toString()))
+        PacketDistributor.sendToPlayer(player, cached);
+      return;
+    }
     if (forecasts.size() + scans.size() >= 2) {
-      player.sendSystemMessage(Component.literal("Planet map busy. Try again shortly."));
+      if (!hud) player.sendSystemMessage(Component.literal("Planet map busy. Try again shortly."));
       return;
     }
     requested.put(player, tick);
+    hudRequests.put(player, hud);
     var level = player.serverLevel();
     long seed =
         ((PlanetGenerator) level.getChunkSource().getGenerator())
@@ -151,8 +185,9 @@ public final class PlanetAtlas {
         level.getChunkSource().getGenerator() instanceof PlanetGenerator g && g.natural;
     String dimension = level.dimension().location().toString();
     double px = player.getX(), pz = player.getZ();
-    player.sendSystemMessage(
-        Component.literal("Preparing planet map without generating chunks..."));
+    if (!hud)
+      player.sendSystemMessage(
+          Component.literal("Preparing planet map without generating chunks..."));
     forecasts.put(
         player,
         CompletableFuture.supplyAsync(
@@ -229,15 +264,22 @@ public final class PlanetAtlas {
         if (System.nanoTime() > deadline) break;
       }
       if (scan.index == data.heights.length) {
-        PacketDistributor.sendToPlayer(player, data);
+        recent.put(player, data);
+        if (Boolean.TRUE.equals(hudRequests.remove(player)))
+          PacketDistributor.sendToPlayer(player, new HudSnapshot(data));
+        else PacketDistributor.sendToPlayer(player, data);
         iterator.remove();
       }
     }
     requested.keySet().removeIf(ServerPlayer::hasDisconnected);
+    recent.keySet().removeIf(ServerPlayer::hasDisconnected);
+    hudRequests.keySet().removeIf(ServerPlayer::hasDisconnected);
   }
 
   public static void stopped(ServerStoppedEvent event) {
     requested.clear();
+    hudRequests.clear();
+    recent.clear();
     forecasts.clear();
     scans.clear();
   }

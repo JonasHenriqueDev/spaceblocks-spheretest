@@ -37,6 +37,11 @@ public record Planet(int radius, int depth) {
     return PeriodicMath.circumference(radius);
   }
 
+  /** Chunk-rounded circumference determines the actual radius, so a half-map is exactly pi. */
+  public double projectionRadius() {
+    return size() / (2.0 * Math.PI);
+  }
+
   public int bottom() {
     return SURFACE - depth;
   }

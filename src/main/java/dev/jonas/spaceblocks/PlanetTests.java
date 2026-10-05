@@ -28,7 +28,7 @@ public final class PlanetTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.1.jar"),
+                .contains("spaceblocks-0.8.2.jar"),
             "Final packaged JAR is the loaded mod");
       for (var key : List.of(SpaceBlocks.SMALL, SpaceBlocks.LARGE)) {
         var level = e.getServer().getLevel(key);
@@ -169,12 +169,14 @@ public final class PlanetTests {
         entity.setDeltaMovement(Vec3.ZERO);
         double base = entity.getGravity();
         settings.realisticGravity = true;
-        entity.setPos(0, 64 + d.radius(), 0);
+        entity.setPos(0, 64 + d.projectionRadius(), 0);
         check(Math.abs(entity.getGravity() - base * Math.exp(-2)) < 1e-10, "Altitude gravity");
         settings.centrifugal = true;
         entity.setDeltaMovement(.3, 0, .4);
         check(
-            Math.abs(entity.getGravity() - (base * Math.exp(-2) - .5 / (d.radius() * Math.E)))
+            Math.abs(
+                    entity.getGravity()
+                        - (base * Math.exp(-2) - .5 / (d.projectionRadius() * Math.E)))
                 < 1e-10,
             "Final centrifugal formula");
         settings.realisticGravity = false;

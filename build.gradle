@@ -54,6 +54,12 @@ neoForge {
             systemProperty 'spaceblocks.testClient', 'true'
             systemProperty 'spaceblocks.bottomClient', 'true'
         }
+        packagedHudClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-hud')
+            programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '900'
+            systemProperty 'spaceblocks.testClient', 'true'
+            systemProperty 'spaceblocks.hudClient', 'true'
+        }
         periodicPerformanceClient {
             client(); loadedMods = []; gameDirectory = project.file('run-performance')
             programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '720'

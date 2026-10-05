@@ -80,18 +80,22 @@ public final class PlanetNetwork {
   }
 
   public static void register(RegisterPayloadHandlersEvent event) {
-    var r = event.registrar("8.1");
+    var r = event.registrar("8.2");
     PlanetManagerNetwork.register(r);
     r.playToServer(
         PlanetAtlas.Request.TYPE,
         PlanetAtlas.Request.CODEC,
         (p, c) -> {
-          if (c.player() instanceof ServerPlayer player) PlanetAtlas.request(player);
+          if (c.player() instanceof ServerPlayer player) PlanetAtlas.request(player, p.hud());
         });
     r.playToClient(
         PlanetAtlas.Snapshot.TYPE,
         PlanetAtlas.Snapshot.CODEC,
         (p, c) -> dev.jonas.spaceblocks.client.PlanetAtlasScreen.receive(p));
+    r.playToClient(
+        PlanetAtlas.HudSnapshot.TYPE,
+        PlanetAtlas.HudSnapshot.CODEC,
+        (p, c) -> dev.jonas.spaceblocks.client.PlanetHud.receive(p.data()));
     r.playToClient(
         Options.TYPE,
         Options.CODEC,

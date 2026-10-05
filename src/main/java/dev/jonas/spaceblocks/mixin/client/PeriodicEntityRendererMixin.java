@@ -47,6 +47,7 @@ abstract class PeriodicEntityRendererMixin {
     var d = PlanetClient.planet();
     return d == null
         ? source
-        : type -> new ProjectedConsumer(source.getBuffer(type), new Matrix4f(), d.radius());
+        : type ->
+            new ProjectedConsumer(source.getBuffer(type), new Matrix4f(), d.projectionRadius());
   }
 }

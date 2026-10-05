@@ -26,11 +26,13 @@ public final class PlanetTunnel {
     final ServerLevel level;
     final Planet planet;
     final int x, z, opposite;
+    final boolean marked;
     final Set<ChunkPos> tickets = new HashSet<>();
     int top, index;
     boolean ready;
 
-    Build(ServerPlayer p) {
+    Build(ServerPlayer p, boolean marked) {
+      this.marked = marked;
       player = p;
       level = p.serverLevel();
       planet = Planet.of(level);
@@ -50,6 +52,10 @@ public final class PlanetTunnel {
   }
 
   public static int create(ServerPlayer p) {
+    return create(p, false);
+  }
+
+  public static int create(ServerPlayer p, boolean marked) {
     if (Planet.of(p.level()) == null) {
       p.sendSystemMessage(Component.literal("Enter a planet first."));
       return 0;
@@ -58,7 +64,7 @@ public final class PlanetTunnel {
       p.sendSystemMessage(Component.literal("A tunnel is already being built."));
       return 0;
     }
-    builds.put(p.serverLevel(), new Build(p));
+    builds.put(p.serverLevel(), new Build(p, marked));
     p.sendSystemMessage(
         Component.literal(
             "Creating two connected, glass-lined shafts at your X/Z and half a map away. Blocks in"
@@ -138,8 +144,16 @@ public final class PlanetTunnel {
         int dx = cell % 5 - 2, dz = cell / 5 - 2, x = end == 0 ? b.x : b.opposite;
         var state =
             (Math.abs(dx) == 2 || Math.abs(dz) == 2)
-                ? Blocks.GLASS.defaultBlockState()
+                ? (b.marked && Math.floorMod(y - b.planet.bottom(), 8) == 0
+                        ? (end == 0 ? Blocks.CYAN_STAINED_GLASS : Blocks.MAGENTA_STAINED_GLASS)
+                        : Blocks.GLASS)
+                    .defaultBlockState()
                 : Blocks.AIR.defaultBlockState();
+        if (b.marked
+            && Math.abs(dx) == 2
+            && Math.abs(dz) == 2
+            && Math.floorMod(y - b.planet.bottom(), 8) == 0)
+          state = Blocks.SEA_LANTERN.defaultBlockState();
         b.level.setBlock(
             pos.set(
                 PeriodicMath.wrap(x + dx, b.planet.size()),
@@ -167,7 +181,12 @@ public final class PlanetTunnel {
                     + b.opposite
                     + ", Z="
                     + b.z
-                    + ". /planet surface returns to an exit."));
+                    + String.format(
+                        Locale.ROOT,
+                        ". Radius=%.3f; half-map angle=180 degrees.",
+                        b.planet.projectionRadius())
+                    + (b.marked ? " Cyan entrance / magenta exit; lit rings every 8 blocks." : "")
+                    + " /planet surface returns to an exit."));
         b.release();
         iterator.remove();
       }

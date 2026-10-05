@@ -96,6 +96,10 @@ public final class PlanetClientTests {
   }
 
   public static void tick(ClientTickEvent.Post e) {
+    if (Boolean.getBoolean("spaceblocks.hudClient")) {
+      PlanetHudClientTests.tick();
+      return;
+    }
     if (Boolean.getBoolean("spaceblocks.bottomClient")) {
       PlanetBottomClientTests.tick();
       return;
@@ -125,7 +129,7 @@ public final class PlanetClientTests {
                   .getCodeSource()
                   .getLocation()
                   .toString()
-                  .contains("spaceblocks-0.8.1.jar"),
+                  .contains("spaceblocks-0.8.2.jar"),
               "Loaded final packaged JAR, not development classes");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);

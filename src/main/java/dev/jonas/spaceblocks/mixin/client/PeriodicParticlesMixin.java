@@ -40,7 +40,7 @@ abstract class PeriodicParticlesMixin {
     p.render(
         d == null
             ? consumer
-            : new ProjectedConsumer(consumer, new Matrix4f(), d.radius(), d.size()),
+            : new ProjectedConsumer(consumer, new Matrix4f(), d.projectionRadius(), d.size()),
         camera,
         partial);
   }

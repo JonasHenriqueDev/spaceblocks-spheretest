@@ -125,6 +125,9 @@ public final class PlanetCommands {
     root.then(
         literal("tunnel")
             .then(
+                literal("axis")
+                    .executes(c -> PlanetTunnel.create(c.getSource().getPlayerOrException(), true)))
+            .then(
                 literal("create")
                     .executes(c -> PlanetTunnel.create(c.getSource().getPlayerOrException())))
             .then(
@@ -164,6 +167,8 @@ public final class PlanetCommands {
                                           + d.size()
                                           + "; radius="
                                           + d.radius()
+                                          + "; projection_radius="
+                                          + d.projectionRadius()
                                           + "; bottom="
                                           + d.bottom()
                                           + "; position="

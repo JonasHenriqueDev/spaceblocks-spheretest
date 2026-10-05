@@ -54,3 +54,10 @@ The original fallthrough remains a half-map X displacement and Y velocity revers
 Chunk rounding is retained: for R=32, the square map is 224 blocks wide, so a half-map connection is 112 blocks while pi*R is approximately 100.53. These are not mathematically exact spherical antipodes; changing the radius or formula to conceal the discrepancy would change the original projection. The local connection aligns the two shaft charts without making that claim.
 
 The extra terrain pass combines its source lightmap with the observer's local block/sky light, so a torch in the shaft can illuminate the visible opposite terrain. This is a local rendering adaptation, not fullbright or a replacement for light propagation in canonical chunks. Both unlit charts remain dark.
+
+
+## 0.8.2 calibrated radius and orientation HUD
+
+At the user's explicit request, the chunk-rounded circumference is now authoritative: effective R = map width / (2*pi). The configured integer remains the size parameter, preserving canonical map boundaries and save storage. The complex exponential and its inverse retain their equations with effective R throughout terrain, entities, selection, particles, variable gravity and satellite calculations. This changes the original parameter choice; it is not an unchanged reproduction of the original rounding mismatch. A half-map displacement now has angle pi in the aligned horizontal section, but camera dependence, the exponential's unattainable center and torus topology remain.
+
+The new HUD is a schematic longitude/latitude atlas using periodic source samples and a live marker. Compass labels refer to Minecraft plane axes, not global spherical poles. Its passive request shares the existing bounded forecast/scan pipeline without generating chunks. Its triangle budget is at most 576, refreshed map data at most once per 30 seconds per client. The client camera cue rises smoothly to 180-degree roll and returns upright; it does not change entity controls, physical gravity, mouse angles or server position. All HUD/menu/transition code is new adaptation, with no Immersive Portals source.
