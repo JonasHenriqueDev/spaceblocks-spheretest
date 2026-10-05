@@ -1,0 +1,21 @@
+{
+  "type": "spaceblocks:periodic_natural",
+  "generator": {
+    "type": "spaceblocks:periodic",
+    "radius": 256,
+    "natural": true,
+    "biome_source": {
+      "type": "spaceblocks:periodic",
+      "radius": 256,
+      "biomes": [
+        "minecraft:ocean",
+        "minecraft:plains",
+        "minecraft:forest",
+        "minecraft:desert",
+        "minecraft:taiga",
+        "minecraft:snowy_plains",
+        "minecraft:stony_peaks"
+      ]
+    }
+  }
+}

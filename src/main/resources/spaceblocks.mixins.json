@@ -6,6 +6,8 @@
   "mixins": [
     "PeriodicLevelMixin",
     "PeriodicGravityMixin",
+    "PeriodicAirDragMixin",
+    "PeriodicBedrockMixin",
     "PeriodicChunkMapMixin",
     "PeriodicEntityTrackingMixin",
     "PeriodicEntitiesMixin",

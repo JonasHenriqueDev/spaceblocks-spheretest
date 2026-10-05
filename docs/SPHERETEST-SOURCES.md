@@ -38,3 +38,11 @@ Original BS=10 internal units per node is omitted: Minecraft block=one node. R=p
 Original centrifugal update has a factor of 2 (`speed.Y += v_horizontal^2/height * dt * 2`). In blocks/tick units this is 2*v_tick^2/height per tick. Base gravity retains Minecraft's per-entity default; variable coefficient is exp(h/R) below surface and exp(-2h/R) above it. Liquid and climbing retain Minecraft behavior. No visual-speed compensation is present.
 
 Algorithms and shader projection adapted under LGPL-2.1-or-later; original contributors credited. Minecraft models/textures/shader includes come from the running game, not copied assets. All new source is provided under LGPL-2.1-or-later; MDK license retained in TEMPLATE_LICENSE.txt.
+
+## 0.8.0 tunnel and atlas
+
+Rechecked `src/content_sao.cpp` (bottom passage), `src/environment.cpp` (variable gravity, air movement) and commit d973e4b40dc0da723921563ff2093e105c345892. Bottom passage is a half-map X shift with Y velocity reversal, not a new physical spherical core. Minecraft living-entity vertical air damping can be disabled for this demonstration; water, lava, elytra and flying keep their native branches. Shaft construction is a new optional Minecraft convenience and replaces blocks only when its command is invoked.
+
+The atlas is new code. Its whole-map longitude/latitude globe compresses relief and is explicitly schematic. Its alternate near-hemisphere view uses the active camera-relative Spheretest exponential, at a virtual reference height of 64. Neither changes gameplay storage or introduces cube faces. Source/video references above remain the basis; inaccessible videos were not claimed as watched.
+
+The catalog, manager GUI, reserved independent dimensions, periodic per-planet seed configuration and separate laboratory are new Minecraft code. The collision-free satellite probe is a vanilla marker armor stand, whose server integration uses the same gravity coefficient and `2 * flatHorizontalSpeed² / exponentialHeight` term. Its initial balance speed is `sqrt(baseGravity * coefficient * exponentialHeight / 2)`. It is an orbit test tool, not evidence of exact Keplerian dynamics, radial physical gravity or collision-safe spaceflight. No compensated visual-speed term was introduced.

@@ -20,6 +20,116 @@ public final class PlanetCommands {
     root.then(literal("small").executes(c -> enter(c.getSource(), true)));
     root.then(literal("natural").executes(c -> enterDimension(c.getSource(), SpaceBlocks.NATURAL)));
     root.then(literal("flat").executes(c -> enterDimension(c.getSource(), SpaceBlocks.LARGE)));
+    root.then(
+        literal("lab")
+            .executes(
+                c -> {
+                  enterDimension(c.getSource(), SpaceBlocks.LAB);
+                  return PlanetLab.prepare(c.getSource().getPlayerOrException());
+                }));
+    root.then(
+        literal("planets")
+            .executes(
+                c -> {
+                  PlanetManagerNetwork.send(c.getSource().getPlayerOrException());
+                  return 1;
+                }));
+    root.then(
+        literal("generate")
+            .then(
+                argument("name", com.mojang.brigadier.arguments.StringArgumentType.word())
+                    .then(
+                        argument(
+                                "radius",
+                                com.mojang.brigadier.arguments.IntegerArgumentType.integer(
+                                    32, 1024))
+                            .executes(
+                                c ->
+                                    PlanetCatalog.generate(
+                                        c.getSource().getPlayerOrException(),
+                                        com.mojang.brigadier.arguments.StringArgumentType.getString(
+                                            c, "name"),
+                                        com.mojang.brigadier.arguments.IntegerArgumentType
+                                            .getInteger(c, "radius"),
+                                        null))
+                            .then(
+                                argument(
+                                        "seed",
+                                        com.mojang.brigadier.arguments.LongArgumentType.longArg())
+                                    .executes(
+                                        c ->
+                                            PlanetCatalog.generate(
+                                                c.getSource().getPlayerOrException(),
+                                                com.mojang.brigadier.arguments.StringArgumentType
+                                                    .getString(c, "name"),
+                                                com.mojang.brigadier.arguments.IntegerArgumentType
+                                                    .getInteger(c, "radius"),
+                                                com.mojang.brigadier.arguments.LongArgumentType
+                                                    .getLong(c, "seed")))))));
+    root.then(
+        literal("enter")
+            .then(
+                argument("name", com.mojang.brigadier.arguments.StringArgumentType.word())
+                    .executes(
+                        c ->
+                            PlanetCatalog.teleport(
+                                c.getSource().getPlayerOrException(),
+                                com.mojang.brigadier.arguments.StringArgumentType.getString(
+                                    c, "name"),
+                                0,
+                                0,
+                                null))));
+    root.then(
+        literal("satellite")
+            .then(
+                literal("launch")
+                    .executes(
+                        c -> PlanetSatellite.launch(c.getSource().getPlayerOrException(), 128, 1))
+                    .then(
+                        argument(
+                                "altitude",
+                                com.mojang.brigadier.arguments.IntegerArgumentType.integer(16, 400))
+                            .executes(
+                                c ->
+                                    PlanetSatellite.launch(
+                                        c.getSource().getPlayerOrException(),
+                                        com.mojang.brigadier.arguments.IntegerArgumentType
+                                            .getInteger(c, "altitude"),
+                                        1))
+                            .then(
+                                argument(
+                                        "speed",
+                                        com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(
+                                            .1, 3))
+                                    .executes(
+                                        c ->
+                                            PlanetSatellite.launch(
+                                                c.getSource().getPlayerOrException(),
+                                                com.mojang.brigadier.arguments.IntegerArgumentType
+                                                    .getInteger(c, "altitude"),
+                                                com.mojang.brigadier.arguments.DoubleArgumentType
+                                                    .getDouble(c, "speed"))))))
+            .then(
+                literal("info")
+                    .executes(c -> PlanetSatellite.info(c.getSource().getPlayerOrException())))
+            .then(
+                literal("remove")
+                    .executes(c -> PlanetSatellite.remove(c.getSource().getPlayerOrException()))));
+    root.then(
+        literal("map")
+            .executes(
+                c -> {
+                  PlanetAtlas.request(c.getSource().getPlayerOrException());
+                  return 1;
+                }));
+    root.then(
+        literal("tunnel")
+            .then(
+                literal("create")
+                    .executes(c -> PlanetTunnel.create(c.getSource().getPlayerOrException())))
+            .then(
+                literal("drop")
+                    .executes(c -> PlanetTunnel.drop(c.getSource().getPlayerOrException()))));
     root.then(literal("core").executes(c -> core(c.getSource())));
     root.then(literal("surface").executes(c -> surface(c.getSource())));
     root.then(
@@ -63,11 +173,14 @@ public final class PlanetCommands {
                                           + "; centrifugal="
                                           + s.centrifugal
                                           + "; fallthrough="
-                                          + s.fallthrough),
+                                          + s.fallthrough
+                                          + "; air_drag="
+                                          + s.airDrag),
                           false);
                   return 1;
                 }));
-    for (String option : new String[] {"realistic_gravity", "centrifugal", "fallthrough"})
+    for (String option :
+        new String[] {"realistic_gravity", "centrifugal", "fallthrough", "air_drag"})
       root.then(
           literal("physics")
               .then(
@@ -88,6 +201,7 @@ public final class PlanetCommands {
                                       case "realistic_gravity" -> s.realisticGravity = value;
                                       case "centrifugal" -> s.centrifugal = value;
                                       case "fallthrough" -> s.fallthrough = value;
+                                      case "air_drag" -> s.airDrag = value;
                                     }
                                     s.setDirty();
                                     for (var player : p.serverLevel().players())
@@ -105,7 +219,7 @@ public final class PlanetCommands {
     return enterDimension(source, small ? SpaceBlocks.SMALL : SpaceBlocks.NATURAL);
   }
 
-  private static int enterDimension(
+  public static int enterDimension(
       CommandSourceStack source,
       net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension)
       throws com.mojang.brigadier.exceptions.CommandSyntaxException {
@@ -127,11 +241,32 @@ public final class PlanetCommands {
       data.putBoolean("planet_return_flying", p.getAbilities().flying);
     }
     level.getChunk(0, 0);
+    int spawnX = 0;
+    var saved = PlanetSettings.get(level);
+    var planet = Planet.of(level);
+    if (saved.hasTunnel
+        && Math.abs(PeriodicMath.wrap(saved.tunnelZ, planet.size())) <= 2
+        && (Math.abs(PeriodicMath.wrap(saved.tunnelX, planet.size())) <= 2
+            || Math.abs(PeriodicMath.wrap(saved.tunnelX + planet.size() / 2, planet.size()))
+                <= 2)) {
+      spawnX = 4;
+    }
     int spawnY =
         level.getHeight(
-                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 0, 0)
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                spawnX,
+                0)
             + 1;
-    p.teleportTo(level, .5, spawnY, .5, Set.of(), 0, 0);
+    while (spawnY < Planet.SURFACE && spawnX < 32) {
+      spawnX += 4;
+      spawnY =
+          level.getHeight(
+                  net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                  spawnX,
+                  0)
+              + 1;
+    }
+    p.teleportTo(level, spawnX + .5, spawnY, .5, Set.of(), 0, 0);
     p.setDeltaMovement(Vec3.ZERO);
     setFlight(p, false);
     PlanetNetwork.sync(p);
@@ -178,6 +313,15 @@ public final class PlanetCommands {
     var p = source.getPlayerOrException();
     if (Planet.of(p.level()) == null) return 0;
     int x = p.blockPosition().getX(), z = p.blockPosition().getZ();
+    var planet = Planet.of(p.level());
+    var settings = PlanetSettings.get(p.level());
+    if (settings.hasTunnel
+        && Math.abs(PeriodicMath.wrap(z - settings.tunnelZ, planet.size())) <= 2
+        && (Math.abs(PeriodicMath.wrap(x - settings.tunnelX, planet.size())) <= 2
+            || Math.abs(PeriodicMath.wrap(x - settings.tunnelX - planet.size() / 2, planet.size()))
+                <= 2)) {
+      x = PeriodicMath.wrap(x + 4, planet.size());
+    }
     int y =
         p.serverLevel()
                 .getHeight(
@@ -185,7 +329,7 @@ public final class PlanetCommands {
                     x,
                     z)
             + 1;
-    p.connection.teleport(p.getX(), y, p.getZ(), p.getYRot(), p.getXRot());
+    p.connection.teleport(x + .5, y, z + .5, p.getYRot(), p.getXRot());
     p.setDeltaMovement(Vec3.ZERO);
     return 1;
   }

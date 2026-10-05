@@ -19,7 +19,8 @@ public final class SpaceBlocks {
   public static final ResourceKey<Level>
       SMALL = ResourceKey.create(Registries.DIMENSION, id("periodic_small")),
       LARGE = ResourceKey.create(Registries.DIMENSION, id("periodic_large")),
-      NATURAL = ResourceKey.create(Registries.DIMENSION, id("periodic_natural"));
+      NATURAL = ResourceKey.create(Registries.DIMENSION, id("periodic_natural")),
+      LAB = ResourceKey.create(Registries.DIMENSION, id("planet_lab"));
   public static final PlanetSettings clientSettings = new PlanetSettings();
   private static final DeferredRegister<MapCodec<? extends ChunkGenerator>> GENERATORS =
       DeferredRegister.create(Registries.CHUNK_GENERATOR, MOD_ID);
@@ -39,11 +40,21 @@ public final class SpaceBlocks {
     NeoForge.EVENT_BUS.addListener(PlanetCommands::register);
     NeoForge.EVENT_BUS.addListener(PlanetServer::tick);
     NeoForge.EVENT_BUS.addListener(PlanetServer::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetAtlas::tick);
+    NeoForge.EVENT_BUS.addListener(PlanetTunnel::tick);
+    NeoForge.EVENT_BUS.addListener(PlanetTunnel::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetAtlas::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetCatalog::started);
+    NeoForge.EVENT_BUS.addListener(PlanetLab::tick);
+    NeoForge.EVENT_BUS.addListener(PlanetLab::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetSatellite::tick);
+    NeoForge.EVENT_BUS.addListener(PlanetSatellite::stopped);
+    NeoForge.EVENT_BUS.addListener(PlanetSatellite::started);
     NeoForge.EVENT_BUS.addListener(PlanetServer::dimensionChanged);
     NeoForge.EVENT_BUS.addListener(PlanetTests::started);
     NeoForge.EVENT_BUS.addListener(PlanetNetworkTests::joined);
     LOGGER.info(
-        "Space Blocks 0.7.1: Jeija/Spheretest periodic terrain and camera-relative exponential"
+        "Space Blocks 0.8.0: Jeija/Spheretest periodic terrain and camera-relative exponential"
             + " projection");
   }
 

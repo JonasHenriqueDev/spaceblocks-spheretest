@@ -23,10 +23,12 @@ public final class PlanetGenerator extends ChunkGenerator {
                       BiomeSource.CODEC
                           .fieldOf("biome_source")
                           .forGetter(PlanetGenerator::getBiomeSource),
-                      Codec.intRange(32, 256).fieldOf("radius").forGetter(g -> g.planet.radius()),
-                      Codec.BOOL.optionalFieldOf("natural", false).forGetter(g -> g.natural))
+                      Codec.intRange(32, 1024).fieldOf("radius").forGetter(g -> g.planet.radius()),
+                      Codec.BOOL.optionalFieldOf("natural", false).forGetter(g -> g.natural),
+                      Codec.LONG.optionalFieldOf("terrain_seed").forGetter(g -> g.explicitSeed))
                   .apply(i, PlanetGenerator::new));
-  public final Planet planet;
+  public Planet planet;
+  private java.util.Optional<Long> explicitSeed = java.util.Optional.empty();
   public final boolean natural;
   private volatile PeriodicTerrain terrain;
 
@@ -35,15 +37,34 @@ public final class PlanetGenerator extends ChunkGenerator {
   }
 
   public PlanetGenerator(BiomeSource source, int radius, boolean natural) {
+    this(source, radius, natural, java.util.Optional.empty());
+  }
+
+  public PlanetGenerator(
+      BiomeSource source, int radius, boolean natural, java.util.Optional<Long> seed) {
     super(source);
     planet = new Planet(radius);
     this.natural = natural;
+    explicitSeed = seed;
+    if (seed.isPresent() && source instanceof PeriodicBiomeSource periodic)
+      periodic.configure(radius, seed.get());
+  }
+
+  public void configure(int radius, long seed) {
+    planet = new Planet(radius);
+    explicitSeed = java.util.Optional.of(seed);
+    terrain = null;
+    if (getBiomeSource() instanceof PeriodicBiomeSource periodic) periodic.configure(radius, seed);
+  }
+
+  public long terrainSeed(RandomState random) {
+    return explicitSeed.orElseGet(() -> PeriodicTerrain.seed(random.sampler()));
   }
 
   private PeriodicTerrain terrain(RandomState random) {
     var result = terrain;
     if (result == null) {
-      long seed = PeriodicTerrain.seed(random.sampler());
+      long seed = terrainSeed(random);
       terrain = result = new PeriodicTerrain(planet.size(), seed);
     }
     return result;
@@ -73,14 +94,21 @@ public final class PlanetGenerator extends ChunkGenerator {
   }
 
   private BlockState naturalBlock(
-      int x, int y, int z, int height, PeriodicTerrain.CaveColumn caves, int biome, List<Tree> trees) {
+      int x,
+      int y,
+      int z,
+      int height,
+      PeriodicTerrain.CaveColumn caves,
+      int biome,
+      List<Tree> trees) {
     if (y <= -496) return (y >= -500 ? Blocks.BEDROCK : Blocks.AIR).defaultBlockState();
     if (y > height) {
       if (y <= 64) return (biome == 5 && y == 64 ? Blocks.ICE : Blocks.WATER).defaultBlockState();
       for (var tree : trees) {
         if (tree.dx == 0 && tree.dz == 0 && y <= tree.crown)
           return (tree.kind == 4 ? Blocks.SPRUCE_LOG : Blocks.OAK_LOG).defaultBlockState();
-        if (y >= tree.crown - 2 && y <= tree.crown + 1
+        if (y >= tree.crown - 2
+            && y <= tree.crown + 1
             && tree.dx + tree.dz + Math.abs(y - tree.crown) <= 5)
           return (tree.kind == 4 ? Blocks.SPRUCE_LEAVES : Blocks.OAK_LEAVES).defaultBlockState();
       }
@@ -93,8 +121,7 @@ public final class PlanetGenerator extends ChunkGenerator {
             .defaultBlockState();
       return Blocks.AIR.defaultBlockState();
     }
-    if (caves.cave(y))
-      return (y < -450 ? Blocks.LAVA : Blocks.AIR).defaultBlockState();
+    if (caves.cave(y)) return (y < -450 ? Blocks.LAVA : Blocks.AIR).defaultBlockState();
     if (y == height)
       return (height <= 65 || biome == 3
               ? Blocks.SAND
@@ -192,11 +219,18 @@ public final class PlanetGenerator extends ChunkGenerator {
   public CompletableFuture<ChunkAccess> fillFromNoise(
       Blender b, RandomState r, StructureManager s, ChunkAccess c) {
     if (!planet.contains(c.getPos())) return CompletableFuture.completedFuture(c);
-    return CompletableFuture.supplyAsync(net.minecraft.Util.wrapThreadWithTaskName("periodic_terrain", () -> {
-      for (var section : c.getSections()) section.acquire();
-      try { return fill(r, c); }
-      finally { for (var section : c.getSections()) section.release(); }
-    }), net.minecraft.Util.backgroundExecutor());
+    return CompletableFuture.supplyAsync(
+        net.minecraft.Util.wrapThreadWithTaskName(
+            "periodic_terrain",
+            () -> {
+              for (var section : c.getSections()) section.acquire();
+              try {
+                return fill(r, c);
+              } finally {
+                for (var section : c.getSections()) section.release();
+              }
+            }),
+        net.minecraft.Util.backgroundExecutor());
   }
 
   private ChunkAccess fill(RandomState r, ChunkAccess c) {

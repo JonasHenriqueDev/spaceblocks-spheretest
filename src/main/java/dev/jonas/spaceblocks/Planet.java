@@ -13,9 +13,19 @@ public record Planet(int radius, int depth) {
   public static final int SURFACE = 64;
   public static final Planet SMALL = new Planet(32), LARGE = new Planet(256);
   public static final Planet NATURAL = new Planet(256, 560);
+  public static final Planet LAB = new Planet(128, 560);
+  public static final java.util.Map<String, Planet> CLIENT_PLANETS = new java.util.HashMap<>();
 
   public static Planet of(Level level) {
     if (level == null) return null;
+    if (level.dimension().equals(SpaceBlocks.LAB)) return LAB;
+    if (level.dimension().location().getNamespace().equals(SpaceBlocks.MOD_ID)
+        && level.dimension().location().getPath().startsWith("generated_")) {
+      if (level instanceof net.minecraft.server.level.ServerLevel server
+          && server.getChunkSource().getGenerator() instanceof PlanetGenerator generator)
+        return new Planet(generator.planet.radius(), 560);
+      return CLIENT_PLANETS.getOrDefault(level.dimension().location().toString(), NATURAL);
+    }
     return level.dimension().equals(SpaceBlocks.SMALL)
         ? SMALL
         : level.dimension().equals(SpaceBlocks.LARGE)

@@ -35,6 +35,19 @@ neoForge {
             programArgument '--nogui'
             systemProperty 'spaceblocks.testServer', 'true'
         }
+        packagedAtlasClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-atlas')
+            programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '900'
+            systemProperty 'spaceblocks.testClient', 'true'
+            systemProperty 'spaceblocks.atlasClient', 'true'
+        }
+        packagedLabClient {
+            client(); loadedMods = []; gameDirectory = project.file('run-atlas')
+            programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '900'
+            systemProperty 'spaceblocks.testClient', 'true'
+            systemProperty 'spaceblocks.labClient', 'true'
+            systemProperty 'spaceblocks.verifyPersistence', providers.gradleProperty('verifyPersistence').getOrElse('false')
+        }
         periodicPerformanceClient {
             client(); loadedMods = []; gameDirectory = project.file('run-performance')
             programArguments.addAll '--quickPlaySingleplayer', 'PeriodicTest', '--width', '1280', '--height', '720'
@@ -50,6 +63,12 @@ neoForge {
             client(); loadedMods = []; gameDirectory = project.file('run-network-client')
             programArguments.addAll '--quickPlayMultiplayer', '127.0.0.1:25580', '--width', '1280', '--height', '720'
             systemProperty 'spaceblocks.testNetworkClient', 'true'
+            systemProperty 'spaceblocks.twoClients', providers.gradleProperty('twoClients').getOrElse('false')
+        }
+        periodicNetworkObserver {
+            client(); loadedMods = []; gameDirectory = project.file('run-network-observer')
+            programArguments.addAll '--quickPlayMultiplayer', '127.0.0.1:25580', '--username', 'Observer', '--width', '960', '--height', '640'
+            systemProperty 'spaceblocks.testNetworkObserver', 'true'
         }
     }
     mods { "${mod_id}" { sourceSet(sourceSets.main) } }
