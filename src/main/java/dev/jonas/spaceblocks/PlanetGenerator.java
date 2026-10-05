@@ -30,6 +30,7 @@ public final class PlanetGenerator extends ChunkGenerator {
   public Planet planet;
   private java.util.Optional<Long> explicitSeed = java.util.Optional.empty();
   public final boolean natural;
+  public volatile NativePlanetTerrain nativeTerrain;
   private volatile PeriodicTerrain terrain;
 
   public PlanetGenerator(BiomeSource source, int radius) {
@@ -54,7 +55,27 @@ public final class PlanetGenerator extends ChunkGenerator {
     planet = new Planet(radius);
     explicitSeed = java.util.Optional.of(seed);
     terrain = null;
+    nativeTerrain = null;
     if (getBiomeSource() instanceof PeriodicBiomeSource periodic) periodic.configure(radius, seed);
+  }
+
+  public void configureNative(
+      net.minecraft.server.MinecraftServer server,
+      int radius,
+      long seed,
+      PlanetType type,
+      boolean poles) {
+    configure(radius, seed);
+    nativeTerrain = new NativePlanetTerrain(server, planet, seed, type, poles);
+  }
+
+  @Override
+  public CompletableFuture<ChunkAccess> createBiomes(
+      RandomState random, Blender blender, StructureManager structures, ChunkAccess chunk) {
+    var nativeGen = nativeTerrain;
+    return nativeGen == null
+        ? super.createBiomes(random, blender, structures, chunk)
+        : nativeGen.generator.createBiomes(nativeGen.random, blender, structures, chunk);
   }
 
   public long terrainSeed(RandomState random) {
@@ -71,6 +92,15 @@ public final class PlanetGenerator extends ChunkGenerator {
   }
 
   public int surface(int x, int z, RandomState random) {
+    if (nativeTerrain != null && nativeTerrain.type == PlanetType.FLAT) return Planet.SURFACE;
+    if (nativeTerrain != null)
+      return nativeTerrain.generator.getBaseHeight(
+              x,
+              z,
+              Heightmap.Types.WORLD_SURFACE_WG,
+              net.minecraft.world.level.LevelHeightAccessor.create(-512, 1536),
+              nativeTerrain.random)
+          - 1;
     return natural ? terrain(random).surface(x, z) : Planet.SURFACE;
   }
 
@@ -176,14 +206,31 @@ public final class PlanetGenerator extends ChunkGenerator {
       BiomeManager b,
       StructureManager m,
       ChunkAccess c,
-      GenerationStep.Carving step) {}
+      GenerationStep.Carving step) {
+    if (nativeTerrain != null
+        && nativeTerrain.type != PlanetType.FLAT
+        && planet.contains(c.getPos()))
+      nativeTerrain.generator.applyCarvers(
+          r, nativeTerrain.seed, nativeTerrain.random, b, m, c, step);
+  }
 
   @Override
-  public void buildSurface(WorldGenRegion r, StructureManager m, RandomState n, ChunkAccess c) {}
+  public void buildSurface(WorldGenRegion r, StructureManager m, RandomState n, ChunkAccess c) {
+    if (nativeTerrain != null
+        && nativeTerrain.type != PlanetType.FLAT
+        && planet.contains(c.getPos())) {
+      nativeTerrain.generator.buildSurface(r, m, nativeTerrain.random, c);
+      nativeTerrain.finishSurface(c);
+    }
+  }
 
   @Override
   public void spawnOriginalMobs(WorldGenRegion r) {
     if (!natural || !planet.contains(r.getCenter())) return;
+    if (nativeTerrain != null) {
+      nativeTerrain.generator.spawnOriginalMobs(r);
+      return;
+    }
     var cp = r.getCenter();
     var random = new WorldgenRandom(new LegacyRandomSource(r.getSeed()));
     random.setDecorationSeed(r.getSeed(), cp.getMinBlockX(), cp.getMinBlockZ());
@@ -193,7 +240,14 @@ public final class PlanetGenerator extends ChunkGenerator {
 
   @Override
   public void applyBiomeDecoration(
-      WorldGenLevel level, ChunkAccess chunk, StructureManager structures) {}
+      WorldGenLevel level, ChunkAccess chunk, StructureManager structures) {
+    if (nativeTerrain != null
+        && nativeTerrain.type != PlanetType.FLAT
+        && planet.contains(chunk.getPos())) {
+      nativeTerrain.generator.applyBiomeDecoration(level, chunk, structures);
+      nativeTerrain.enrich(level, chunk);
+    }
+  }
 
   @Override
   public void createStructures(
@@ -202,10 +256,21 @@ public final class PlanetGenerator extends ChunkGenerator {
       StructureManager manager,
       ChunkAccess chunk,
       net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager
-          templates) {}
+          templates) {
+    if (nativeTerrain != null
+        && nativeTerrain.type != PlanetType.FLAT
+        && planet.contains(chunk.getPos()))
+      nativeTerrain.generator.createStructures(
+          registry, nativeTerrain.structures, manager, chunk, templates);
+  }
 
   @Override
-  public void createReferences(WorldGenLevel level, StructureManager manager, ChunkAccess chunk) {}
+  public void createReferences(WorldGenLevel level, StructureManager manager, ChunkAccess chunk) {
+    if (nativeTerrain != null
+        && nativeTerrain.type != PlanetType.FLAT
+        && planet.contains(chunk.getPos()))
+      nativeTerrain.generator.createReferences(level, manager, chunk);
+  }
 
   public BlockState block(int y) {
     if (y > Planet.SURFACE || y <= planet.bottom()) return Blocks.AIR.defaultBlockState();
@@ -219,6 +284,20 @@ public final class PlanetGenerator extends ChunkGenerator {
   public CompletableFuture<ChunkAccess> fillFromNoise(
       Blender b, RandomState r, StructureManager s, ChunkAccess c) {
     if (!planet.contains(c.getPos())) return CompletableFuture.completedFuture(c);
+    if (nativeTerrain != null) {
+      var nativeGen = nativeTerrain;
+      if (nativeGen.type == PlanetType.FLAT)
+        return CompletableFuture.supplyAsync(
+            () -> nativeGen.fillFlat(c), net.minecraft.Util.backgroundExecutor());
+      return nativeGen
+          .generator
+          .fillFromNoise(b, nativeGen.random, s, c)
+          .thenApply(
+              chunk -> {
+                nativeGen.foundation(chunk);
+                return chunk;
+              });
+    }
     return CompletableFuture.supplyAsync(
         net.minecraft.Util.wrapThreadWithTaskName(
             "periodic_terrain",
@@ -300,6 +379,9 @@ public final class PlanetGenerator extends ChunkGenerator {
 
   @Override
   public int getBaseHeight(int x, int z, Heightmap.Types t, LevelHeightAccessor l, RandomState r) {
+    if (nativeTerrain != null && nativeTerrain.type == PlanetType.FLAT) return Planet.SURFACE + 1;
+    if (nativeTerrain != null)
+      return nativeTerrain.generator.getBaseHeight(x, z, t, l, nativeTerrain.random);
     return Math.max(
             surface(x, z, r), t == Heightmap.Types.WORLD_SURFACE_WG ? 64 : Integer.MIN_VALUE)
         + 1;
@@ -307,6 +389,14 @@ public final class PlanetGenerator extends ChunkGenerator {
 
   @Override
   public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor l, RandomState r) {
+    if (nativeTerrain != null && nativeTerrain.type == PlanetType.FLAT) {
+      var states = new BlockState[l.getHeight()];
+      for (int i = 0; i < states.length; i++)
+        states[i] = nativeTerrain.flatBlock(x, l.getMinBuildHeight() + i, z);
+      return new NoiseColumn(l.getMinBuildHeight(), states);
+    }
+    if (nativeTerrain != null)
+      return nativeTerrain.generator.getBaseColumn(x, z, l, nativeTerrain.random);
     var states = new BlockState[l.getHeight()];
     int height = surface(x, z, r), biome = natural ? terrain(r).biome(x, z) : 1;
     var caves = natural ? terrain(r).caves(x, z, height) : null;

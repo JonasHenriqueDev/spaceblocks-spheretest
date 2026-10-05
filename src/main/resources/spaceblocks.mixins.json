@@ -4,6 +4,8 @@
   "package": "dev.jonas.spaceblocks.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "PeriodicRandomStateAccessor",
+    "PeriodicWorldgenSeedMixin",
     "PeriodicLevelMixin",
     "PeriodicGravityMixin",
     "PeriodicAirDragMixin",

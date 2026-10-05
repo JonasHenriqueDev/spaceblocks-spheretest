@@ -11,4 +11,6 @@ Adaptation for Minecraft Java 1.21.1 / NeoForge: JonasHenriqueDev. No affiliatio
 
 Minecraft is developed by Mojang Studios. NeoForge MDK: https://github.com/NeoForgeMDKs/MDK-1.21.1-ModDevGradle; its original license is preserved in TEMPLATE_LICENSE.txt. Game assets are supplied by Minecraft.
 
+Since 0.9.0, preset planets call the installed Minecraft world-generation engine and registered biome features (including native trees, caves, ore veins and structures). Minecraft source/assets are not redistributed. Periodic density blending, preset configuration, dry surface adaptation and crossing-camera controls are new mod code; their deviations are documented in docs/SPHERETEST-SOURCES.md.
+
 The former portal/cube implementation is removed from the active source. Its historical attribution remains in the recovery-0.5.0 Git tag.

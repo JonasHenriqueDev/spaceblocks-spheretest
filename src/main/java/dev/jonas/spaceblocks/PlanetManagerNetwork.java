@@ -10,8 +10,21 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PlanetManagerNetwork {
   public record Action(
-      int action, String name, int radius, String seed, double x, double z, String height)
+      int action,
+      String name,
+      int radius,
+      String seed,
+      double x,
+      double z,
+      String height,
+      String preset,
+      boolean poles)
       implements CustomPacketPayload {
+    public Action(
+        int action, String name, int radius, String seed, double x, double z, String height) {
+      this(action, name, radius, seed, x, z, height, "earth", true);
+    }
+
     public static final Type<Action> TYPE =
         new Type<>(
             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
@@ -26,6 +39,8 @@ public final class PlanetManagerNetwork {
               b.writeDouble(p.x);
               b.writeDouble(p.z);
               b.writeUtf(p.height, 24);
+              b.writeUtf(p.preset, 16);
+              b.writeBoolean(p.poles);
             },
             b ->
                 new Action(
@@ -35,7 +50,9 @@ public final class PlanetManagerNetwork {
                     b.readUtf(24),
                     b.readDouble(),
                     b.readDouble(),
-                    b.readUtf(24)));
+                    b.readUtf(24),
+                    b.readUtf(16),
+                    b.readBoolean()));
 
     public Type<Action> type() {
       return TYPE;
@@ -66,6 +83,8 @@ public final class PlanetManagerNetwork {
                 b.writeVarInt(e.radius());
                 b.writeLong(e.seed());
                 b.writeBoolean(e.generated());
+                b.writeUtf(e.type().id(), 16);
+                b.writeBoolean(e.poles());
               }
             },
             b -> {
@@ -79,6 +98,8 @@ public final class PlanetManagerNetwork {
                         b.readUtf(128),
                         b.readVarInt(),
                         b.readLong(),
+                        b.readBoolean(),
+                        PlanetType.parse(b.readUtf(16)),
                         b.readBoolean()));
               return new ListPacket(entries);
             });
@@ -109,7 +130,12 @@ public final class PlanetManagerNetwork {
               case 0 -> send(player);
               case 1 -> {
                 PlanetCatalog.generate(
-                    player, p.name, p.radius, p.seed.isBlank() ? null : Long.valueOf(p.seed));
+                    player,
+                    p.name,
+                    p.radius,
+                    p.seed.isBlank() ? null : Long.valueOf(p.seed),
+                    PlanetType.parse(p.preset),
+                    p.poles);
                 send(player);
               }
               case 2, 3 -> {
@@ -128,7 +154,7 @@ public final class PlanetManagerNetwork {
               }
               default -> {}
             }
-          } catch (NumberFormatException ex) {
+          } catch (IllegalArgumentException ex) {
             player.sendSystemMessage(
                 net.minecraft.network.chat.Component.literal(
                     "Invalid number. Use a numeric radius, seed and coordinates, or surface for"

@@ -184,6 +184,10 @@ public final class PlanetAtlas {
     boolean natural =
         level.getChunkSource().getGenerator() instanceof PlanetGenerator g && g.natural;
     String dimension = level.dimension().location().toString();
+    var nativeTerrain =
+        level.getChunkSource().getGenerator() instanceof PlanetGenerator generator
+            ? generator.nativeTerrain
+            : null;
     double px = player.getX(), pz = player.getZ();
     if (!hud)
       player.sendSystemMessage(
@@ -203,6 +207,22 @@ public final class PlanetAtlas {
                       i = z * n + x;
                   heights[i] = natural ? Math.max(64, terrain.surface(wx, wz)) : 64;
                   colors[i] = natural ? BIOME_COLORS[terrain.biome(wx, wz)] : BIOME_COLORS[1];
+                  if (nativeTerrain != null) {
+                    if (nativeTerrain.type == PlanetType.FLAT) heights[i] = 64;
+                    colors[i] =
+                        nativeTerrain.type.polar(wz, planet.size(), nativeTerrain.poles)
+                            ? 0xD6E5E8
+                            : switch (nativeTerrain.type) {
+                              case DESERT -> 0xD6BE7B;
+                              case JUNGLE -> 0x377B34;
+                              case MUSHROOM -> 0x957C89;
+                              case DIRT -> 0x90694C;
+                              case STONE -> 0x8B9098;
+                              case NETHER -> 0x933A32;
+                              case FLAT -> 0x7DAA58;
+                              default -> colors[i];
+                            };
+                  }
                 }
               return new Snapshot(
                   dimension,

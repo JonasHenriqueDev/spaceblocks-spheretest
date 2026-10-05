@@ -111,7 +111,7 @@ public final class PlanetNetwork {
   }
 
   public static void register(RegisterPayloadHandlersEvent event) {
-    var r = event.registrar("8.3");
+    var r = event.registrar("9.0");
     r.playToClient(
         ForgetChunk.TYPE,
         ForgetChunk.CODEC,

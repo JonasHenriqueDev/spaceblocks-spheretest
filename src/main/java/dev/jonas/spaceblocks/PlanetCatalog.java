@@ -17,7 +17,18 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 public final class PlanetCatalog extends SavedData {
   public static final int SLOTS = 16;
 
-  public record Entry(String name, String dimension, int radius, long seed, boolean generated) {}
+  public record Entry(
+      String name,
+      String dimension,
+      int radius,
+      long seed,
+      boolean generated,
+      PlanetType type,
+      boolean poles) {
+    public Entry(String name, String dimension, int radius, long seed, boolean generated) {
+      this(name, dimension, radius, seed, generated, PlanetType.LEGACY, false);
+    }
+  }
 
   private final List<Entry> generated = new ArrayList<>();
   private static final Factory<PlanetCatalog> FACTORY =
@@ -40,7 +51,9 @@ public final class PlanetCatalog extends SavedData {
               "spaceblocks:generated_" + String.format(Locale.ROOT, "%02d", i + 1),
               t.getInt("radius"),
               t.getLong("seed"),
-              true));
+              true,
+              t.contains("type") ? PlanetType.parse(t.getString("type")) : PlanetType.LEGACY,
+              t.getBoolean("poles")));
     }
     return result;
   }
@@ -53,6 +66,8 @@ public final class PlanetCatalog extends SavedData {
       t.putString("name", e.name());
       t.putInt("radius", e.radius());
       t.putLong("seed", e.seed());
+      t.putString("type", e.type().id());
+      t.putBoolean("poles", e.poles());
       list.add(t);
     }
     tag.put("planets", list);
@@ -101,7 +116,8 @@ public final class PlanetCatalog extends SavedData {
     var level = server.getLevel(key(e.dimension()));
     if (level == null || !(level.getChunkSource().getGenerator() instanceof PlanetGenerator g))
       throw new IllegalStateException("Planet dimension unavailable: " + e.dimension());
-    g.configure(e.radius(), e.seed());
+    if (e.type() == PlanetType.LEGACY) g.configure(e.radius(), e.seed());
+    else g.configureNative(server, e.radius(), e.seed(), e.type(), e.poles());
   }
 
   public static void started(ServerStartedEvent event) {
@@ -115,12 +131,22 @@ public final class PlanetCatalog extends SavedData {
   }
 
   public static int generate(ServerPlayer player, String name, int radius, Long seed) {
+    return generate(player, name, radius, seed, PlanetType.EARTH, true);
+  }
+
+  public static int generate(
+      ServerPlayer player, String name, int radius, Long seed, PlanetType type, boolean poles) {
     if (!player.hasPermissions(2)) return 0;
     var catalog = get(player.server);
-    if (!validName(name) || radius < 32 || radius > 1024) {
+    if (!validName(name)
+        || radius < 32
+        || radius > 128
+        || type == PlanetType.LEGACY
+        || type == PlanetType.NETHER && poles) {
       player.sendSystemMessage(
           Component.literal(
-              "Name: lowercase letters/digits/_/-, up to 24 characters. Radius: 32..1024 blocks."));
+              "Name: lowercase letters/digits/_/-, up to 24 characters. Radius: 32..128. Nether has"
+                  + " no ice poles."));
       return 0;
     }
     if (catalog.find(player.server, name) != null) {
@@ -135,16 +161,13 @@ public final class PlanetCatalog extends SavedData {
       return 0;
     }
     var e =
-        new Entry(
+        create(
+            player.server,
             name,
-            "spaceblocks:generated_"
-                + String.format(Locale.ROOT, "%02d", catalog.generated.size() + 1),
             radius,
             seed == null ? new java.security.SecureRandom().nextLong() : seed,
-            true);
-    configure(player.server, e);
-    catalog.generated.add(e);
-    catalog.setDirty();
+            type,
+            poles);
     player.sendSystemMessage(
         Component.literal(
             "Created "
@@ -154,8 +177,39 @@ public final class PlanetCatalog extends SavedData {
                 + ", map="
                 + PeriodicMath.circumference(radius)
                 + ", seed="
-                + e.seed()));
+                + e.seed()
+                + ", type="
+                + type.id()
+                + ", ice_poles="
+                + poles));
     return teleport(player, name, 0, 0, null);
+  }
+
+  public static Entry create(
+      MinecraftServer server, String name, int radius, long seed, PlanetType type, boolean poles) {
+    var catalog = get(server);
+    if (!validName(name)
+        || radius < 32
+        || radius > 128
+        || type == PlanetType.LEGACY
+        || type == PlanetType.NETHER && poles
+        || catalog.find(server, name) != null
+        || catalog.generated.size() >= SLOTS)
+      throw new IllegalArgumentException("Invalid or existing planet");
+    var entry =
+        new Entry(
+            name,
+            "spaceblocks:generated_"
+                + String.format(Locale.ROOT, "%02d", catalog.generated.size() + 1),
+            radius,
+            seed,
+            true,
+            type,
+            poles);
+    configure(server, entry);
+    catalog.generated.add(entry);
+    catalog.setDirty();
+    return entry;
   }
 
   public static int teleport(ServerPlayer player, String name, double x, double z, Double y) {

@@ -55,7 +55,7 @@ public final class PlanetBottomClientTests {
                 .getCodeSource()
                 .getLocation()
                 .toString()
-                .contains("spaceblocks-0.8.3.jar"),
+                .contains("spaceblocks-0.9.0.jar"),
             "Final packaged bottom-passage JAR loaded");
         mc.options.pauseOnLostFocus = false;
         mc.options.renderDistance().set(5);
@@ -147,6 +147,18 @@ public final class PlanetBottomClientTests {
         if (hit instanceof BlockHitResult h && h.getType() == HitResult.Type.BLOCK)
           mc.gameMode.continueDestroyBlock(h.getBlockPos(), h.getDirection());
       }
+      if (ticks == 390) {
+        mc.gameMode.stopDestroyBlock();
+        server(
+            p -> {
+              p.getAbilities().flying = true;
+              p.onUpdateAbilities();
+              p.connection.teleport(40.5, 32.2, 30.5, 0, 90);
+              p.setDeltaMovement(Vec3.ZERO);
+            });
+      }
+      if (ticks == 399)
+        check(mc.player.getXRot() > 85, "Controlled crossing starts with downward look");
       if (ticks == 400) {
         mc.gameMode.stopDestroyBlock();
         server(
@@ -168,6 +180,7 @@ public final class PlanetBottomClientTests {
       }
       if (ticks == 440) {
         check(smallCrossed, "Client receives manual-tunnel crossing");
+        check(mc.player.getXRot() < -85, "Bottom crossing reflects downward look upward");
         server(
             p -> {
               var s = PlanetSettings.get(p.level());

@@ -41,8 +41,7 @@ public final class PlanetCommands {
                     .then(
                         argument(
                                 "radius",
-                                com.mojang.brigadier.arguments.IntegerArgumentType.integer(
-                                    32, 1024))
+                                com.mojang.brigadier.arguments.IntegerArgumentType.integer(32, 128))
                             .executes(
                                 c ->
                                     PlanetCatalog.generate(
@@ -66,6 +65,48 @@ public final class PlanetCommands {
                                                     .getInteger(c, "radius"),
                                                 com.mojang.brigadier.arguments.LongArgumentType
                                                     .getLong(c, "seed")))))));
+    // Typed form retains the old four-argument syntax while offering explicit presets/poles.
+    for (var type : PlanetType.values()) {
+      if (type == PlanetType.LEGACY) continue;
+      root.then(
+          literal("generate")
+              .then(
+                  argument("name", com.mojang.brigadier.arguments.StringArgumentType.word())
+                      .then(
+                          argument(
+                                  "radius",
+                                  com.mojang.brigadier.arguments.IntegerArgumentType.integer(
+                                      32, 128))
+                              .then(
+                                  literal(type.id())
+                                      .executes(
+                                          c -> generateTyped(c, type, null, type.defaultPoles))
+                                      .then(
+                                          argument(
+                                                  "seed",
+                                                  com.mojang.brigadier.arguments.LongArgumentType
+                                                      .longArg())
+                                              .executes(
+                                                  c ->
+                                                      generateTyped(
+                                                          c,
+                                                          type,
+                                                          com.mojang.brigadier.arguments
+                                                              .LongArgumentType.getLong(c, "seed"),
+                                                          type.defaultPoles))
+                                              .then(
+                                                  argument("ice_poles", BoolArgumentType.bool())
+                                                      .executes(
+                                                          c ->
+                                                              generateTyped(
+                                                                  c,
+                                                                  type,
+                                                                  com.mojang.brigadier.arguments
+                                                                      .LongArgumentType.getLong(
+                                                                      c, "seed"),
+                                                                  BoolArgumentType.getBool(
+                                                                      c, "ice_poles")))))))));
+    }
     root.then(
         literal("enter")
             .then(
@@ -180,7 +221,17 @@ public final class PlanetCommands {
                                           + "; fallthrough="
                                           + s.fallthrough
                                           + "; air_drag="
-                                          + s.airDrag),
+                                          + s.airDrag
+                                          + (p.serverLevel().getChunkSource().getGenerator()
+                                                      instanceof PlanetGenerator g
+                                                  && g.nativeTerrain != null
+                                              ? "; type="
+                                                  + g.nativeTerrain.type.id()
+                                                  + "; ice_poles="
+                                                  + g.nativeTerrain.poles
+                                                  + "; resources="
+                                                  + g.nativeTerrain.resources()
+                                              : "")),
                           false);
                   return 1;
                 }));
@@ -217,6 +268,21 @@ public final class PlanetCommands {
                                     return 1;
                                   }))));
     event.getDispatcher().register(root);
+  }
+
+  private static int generateTyped(
+      com.mojang.brigadier.context.CommandContext<CommandSourceStack> c,
+      PlanetType type,
+      Long seed,
+      boolean poles)
+      throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    return PlanetCatalog.generate(
+        c.getSource().getPlayerOrException(),
+        com.mojang.brigadier.arguments.StringArgumentType.getString(c, "name"),
+        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "radius"),
+        seed,
+        type,
+        poles);
   }
 
   public static int enter(CommandSourceStack source, boolean small)

@@ -52,9 +52,10 @@ public final class SpaceBlocks {
     NeoForge.EVENT_BUS.addListener(PlanetSatellite::started);
     NeoForge.EVENT_BUS.addListener(PlanetServer::dimensionChanged);
     NeoForge.EVENT_BUS.addListener(PlanetTests::started);
+    NeoForge.EVENT_BUS.addListener(PlanetPresetTests::tick);
     NeoForge.EVENT_BUS.addListener(PlanetNetworkTests::joined);
     LOGGER.info(
-        "Space Blocks 0.8.3: Jeija/Spheretest periodic terrain and camera-relative exponential"
+        "Space Blocks 0.9.0: Jeija/Spheretest periodic terrain and camera-relative exponential"
             + " projection");
   }
 

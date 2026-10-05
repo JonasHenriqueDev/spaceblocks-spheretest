@@ -15,6 +15,9 @@ public final class PlanetManagerScreen extends Screen {
   private String selected = "natural", error = "";
   private EditBox name, radius, seed, x, z, heightField;
   private Button generateButton;
+  private PlanetType newType = PlanetType.EARTH;
+  private boolean icePoles = true;
+  private Button typeButton, polesButton;
 
   public PlanetManagerScreen(List<PlanetCatalog.Entry> entries) {
     super(Component.literal("Planets"));
@@ -48,6 +51,7 @@ public final class PlanetManagerScreen extends Screen {
 
   @Override
   protected void init() {
+    boolean compact = height < 300;
     int left = 14,
         right = width / 2 + 8,
         listWidth = right - left - 20,
@@ -56,7 +60,7 @@ public final class PlanetManagerScreen extends Screen {
     for (int i = page * 5; i < Math.min(entries.size(), page * 5 + 5); i++) {
       var e = entries.get(i);
       button(
-          e.name() + "  R=" + e.radius(),
+          e.name() + "  R=" + e.radius() + " " + e.type().id(),
           left,
           50 + (i % 5) * 22,
           listWidth,
@@ -90,19 +94,44 @@ public final class PlanetManagerScreen extends Screen {
         190,
         listWidth,
         () -> PacketDistributor.sendToServer(PlanetManagerNetwork.Action.list()));
-    name = field(right, 60, available, "new_planet");
-    radius = field(right, 92, 60, "64");
-    seed = field(right + 66, 92, available - 66, "");
+    name = field(right, compact ? 46 : 60, available, "new_planet");
+    radius = field(right, compact ? 74 : 92, 60, "64");
+    seed = field(right + 66, compact ? 74 : 92, available - 66, "");
+    typeButton =
+        button(
+            "Type: " + newType.id(),
+            right,
+            compact ? 98 : 116,
+            available / 2 - 2,
+            () -> {
+              var types = PlanetType.values();
+              newType = types[newType.ordinal() + 1 == types.length ? 1 : newType.ordinal() + 1];
+              icePoles = newType.defaultPoles;
+              typeButton.setMessage(Component.literal("Type: " + newType.id()));
+              polesButton.setMessage(Component.literal("Ice poles: " + (icePoles ? "ON" : "OFF")));
+              polesButton.active = newType != PlanetType.NETHER;
+            });
+    polesButton =
+        button(
+            "Ice poles: " + (icePoles ? "ON" : "OFF"),
+            right + available / 2 + 2,
+            compact ? 98 : 116,
+            available / 2 - 2,
+            () -> {
+              icePoles = !icePoles;
+              polesButton.setMessage(Component.literal("Ice poles: " + (icePoles ? "ON" : "OFF")));
+            });
+    polesButton.active = newType != PlanetType.NETHER;
     generateButton =
         button(
             "Generate new planet",
             right,
-            116,
+            compact ? 122 : 142,
             available,
             () -> {
               try {
                 int r = Integer.parseInt(radius.getValue());
-                if (!PlanetCatalog.validName(name.getValue()) || r < 32 || r > 1024)
+                if (!PlanetCatalog.validName(name.getValue()) || r < 32 || r > 128)
                   throw new IllegalArgumentException();
                 if (entries.stream().anyMatch(e -> e.name().equals(name.getValue()))) {
                   error = "Name already exists.";
@@ -112,18 +141,24 @@ public final class PlanetManagerScreen extends Screen {
                 selected = name.getValue();
                 PacketDistributor.sendToServer(
                     new PlanetManagerNetwork.Action(
-                        1, name.getValue(), r, seed.getValue(), 0, 0, ""));
+                        1, name.getValue(), r, seed.getValue(), 0, 0, "", newType.id(), icePoles));
                 error = "";
               } catch (IllegalArgumentException e) {
-                error = "Check name, radius (32..1024) and seed.";
+                error = "Check name, radius (32..128) and seed.";
               }
             });
     int coordinateWidth = (available - 8) / 3;
-    x = field(right, 168, coordinateWidth, "0");
-    z = field(right + coordinateWidth + 4, 168, coordinateWidth, "0");
-    heightField = field(right + 2 * (coordinateWidth + 4), 168, coordinateWidth, "surface");
-    button("Teleport", right, 194, available / 2 - 2, () -> travel(2));
-    button("Enter + map", right + available / 2 + 2, 194, available / 2 - 2, () -> travel(3));
+    x = field(right, compact ? 184 : 206, coordinateWidth, "0");
+    z = field(right + coordinateWidth + 4, compact ? 184 : 206, coordinateWidth, "0");
+    heightField =
+        field(right + 2 * (coordinateWidth + 4), compact ? 184 : 206, coordinateWidth, "surface");
+    button("Teleport", right, compact ? 208 : 232, available / 2 - 2, () -> travel(2));
+    button(
+        "Enter + map",
+        right + available / 2 + 2,
+        compact ? 208 : 232,
+        available / 2 - 2,
+        () -> travel(3));
     button("Back", width - 84, 10, 70, () -> onClose());
   }
 
@@ -146,11 +181,12 @@ public final class PlanetManagerScreen extends Screen {
 
   @Override
   public void render(GuiGraphics g, int mx, int my, float pt) {
+    boolean compact = height < 300;
     try {
       int r = Integer.parseInt(radius.getValue());
       generateButton.setMessage(
           Component.literal(
-              r >= 32 && r <= 1024
+              r >= 32 && r <= 128
                   ? "Generate "
                       + PeriodicMath.circumference(r)
                       + "x"
@@ -162,23 +198,36 @@ public final class PlanetManagerScreen extends Screen {
     g.fill(0, 0, width, height, 0xFF0B101C);
     int right = width / 2 + 8;
     g.drawString(font, "PLANETS", 14, 16, 0xFFFFFF, false);
-    g.drawString(font, "Saved planets · select, create and travel", 14, 34, 0xA2BAD4, false);
-    g.drawString(font, "NEW PLANET", right, 46, 0xFFFFFF, false);
-    g.drawString(font, "Radius / Seed (blank = random)", right, 81, 0xA2BAD4, false);
-    g.drawString(font, "Selected: " + selected, right, 143, 0xF0D078, false);
-    g.drawString(font, "X / Z / Y or surface", right, 155, 0xA2BAD4, false);
-    g.drawString(
-        font,
-        "New planets are independent; existing terrain is preserved.",
-        14,
-        height - 29,
-        0xA2BAD4,
-        false);
+    g.drawString(font, "Saved planets", 14, 34, 0xA2BAD4, false);
+    g.drawString(font, "NEW PLANET", right, compact ? 32 : 46, 0xFFFFFF, false);
+    g.drawString(font, "Radius / Seed (blank = random)", right, compact ? 63 : 81, 0xA2BAD4, false);
+    g.drawString(font, "Selected: " + selected, right, compact ? 146 : 172, 0xF0D078, false);
+    entries.stream()
+        .filter(e -> e.name().equals(selected))
+        .findFirst()
+        .ifPresent(
+            e ->
+                g.drawString(
+                    font,
+                    e.type().id() + " · ice poles " + (e.poles() ? "ON" : "OFF"),
+                    right,
+                    compact ? 158 : 182,
+                    0xA2BAD4,
+                    false));
+    g.drawString(font, "X / Z / Y or surface", right, compact ? 172 : 192, 0xA2BAD4, false);
+    if (!compact)
+      g.drawString(
+          font,
+          "New planets are independent; existing terrain is preserved.",
+          14,
+          height - 29,
+          0xA2BAD4,
+          false);
     g.drawString(
         font,
         error.isEmpty() ? "Up to 16 generated planets per world." : error,
         14,
-        height - 16,
+        height - (compact ? 12 : 16),
         error.isEmpty() ? 0xA2BAD4 : 0xFF7777,
         false);
     super.render(g, mx, my, pt);

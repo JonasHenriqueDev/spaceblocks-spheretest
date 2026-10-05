@@ -190,11 +190,86 @@ public final class PlanetNetworkClientTests {
       }
       if (tick == 1600) {
         check(!PlanetClient.active(), "TCP returns home after generated planet visit");
+        command("planet generate tcp_flat_090 128 flat 777 false");
+        command("planet enter tcp_flat_090");
+      }
+      if (tick == 1740) {
+        check(
+            PlanetClient.active() && PlanetClient.planet().radius() == 128,
+            "TCP creates flat preset with maximum requested radius");
+        check(
+            mc.level
+                    .getChunkSource()
+                    .getChunkNow(0, 0)
+                    .getHeight(
+                        net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 0, 0)
+                == 64,
+            "TCP flat terrain has exact surface height");
+        command("planet planets");
+      }
+      if (tick == 1790) {
+        check(mc.screen instanceof PlanetManagerScreen, "Typed manager opens over TCP");
+        var screen = (PlanetManagerScreen) mc.screen;
+        check(
+            screen.entries().stream()
+                .anyMatch(
+                    p ->
+                        p.name().equals("tcp_flat_090")
+                            && p.type() == PlanetType.FLAT
+                            && !p.poles()
+                            && p.seed() == 777),
+            "Manager packet retains preset and optional poles");
+        var typeButton =
+            (net.minecraft.client.gui.components.Button)
+                screen.children().stream()
+                    .filter(
+                        w ->
+                            w instanceof net.minecraft.client.gui.components.Button b
+                                && b.getMessage().getString().startsWith("Type:"))
+                    .findFirst()
+                    .orElseThrow();
+        for (int i = 0; i < 7; i++) typeButton.onPress();
+        check(
+            typeButton.getMessage().getString().equals("Type: flat"),
+            "Type selector reaches flat preset");
+        check(
+            screen.children().stream()
+                .filter(w -> w instanceof net.minecraft.client.gui.components.AbstractWidget)
+                .map(w -> (net.minecraft.client.gui.components.AbstractWidget) w)
+                .allMatch(w -> w.getY() + w.getHeight() <= screen.height),
+            "All manager controls fit the current GUI height");
+        net.minecraft.client.Screenshot.grab(
+            mc.gameDirectory, "typed-planet-manager.png", mc.getMainRenderTarget(), m -> {});
+        mc.setScreen(null);
+        command("planet generate tcp_jungle_090 64 jungle 888 false");
+        command("planet enter tcp_jungle_090");
+      }
+      if (tick == 1970) {
+        check(
+            PlanetClient.active() && PlanetClient.planet().radius() == 64,
+            "TCP creates native jungle planet");
+        check(
+            mc.level
+                .getBiome(mc.player.blockPosition())
+                .is(net.minecraft.world.level.biome.Biomes.JUNGLE),
+            "Native jungle biome reaches the client");
+        command("planet fly");
+        command("tp @s 0.5 160 0.5 0 90");
+      }
+      if (tick == 2050) {
+        check(
+            PeriodicRenderer.drawn > 0, "Native jungle terrain renders with the planet projection");
+        net.minecraft.client.Screenshot.grab(
+            mc.gameDirectory, "typed-jungle-planet.png", mc.getMainRenderTarget(), m -> {});
+        command("planet leave");
+      }
+      if (tick == 2110) {
+        check(!PlanetClient.active(), "TCP leaves native preset safely");
         Files.write(mc.gameDirectory.toPath().resolve("periodic-network-results.txt"), results);
         SpaceBlocks.LOGGER.info("PERIODIC_NETWORK_TEST_PASS");
         command("save-all flush");
       }
-      if (tick == 1640) {
+      if (tick == 2150) {
         command("stop");
         finished = true;
         mc.stop();
