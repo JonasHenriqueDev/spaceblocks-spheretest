@@ -41,6 +41,7 @@ public final class PeriodicRenderer {
   }
 
   private static final LinkedHashMap<BlockPos, Mesh> meshes = new LinkedHashMap<>(256, .75f, true);
+  private static final net.minecraft.core.Direction[] faces = net.minecraft.core.Direction.values();
   private static final ExecutorService workers = Executors.newFixedThreadPool(2, task -> {
     var thread = new Thread(task, "SpaceBlocks-mesh");
     thread.setDaemon(true);
@@ -140,7 +141,12 @@ public final class PeriodicRenderer {
           }
           if (SpaceBlocks.clientSettings.fallthrough && y + 16 < d.bottom()) continue;
           // Match the normal vertical view budget instead of compiling the entire 1536-block column.
-          if (Math.abs(y + 8 - eye.y) > range * 16.0 + 16) continue;
+          double ground = chunk.getHeight(
+              net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8) + 16;
+          double anchor = Math.min(eye.y, ground);
+          // High cameras must keep the ground, even when it is farther below than the view budget.
+          // Underground, the same window follows the camera rather than the distant surface.
+          if (y + 16 < anchor - range * 16.0 || y > eye.y + range * 16.0 + 16) continue;
           visibleSections.add(origin);
           if (aboveSurface && y + 16 >= chunk.getHeight(
               net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, 8, 8) - 32)
@@ -153,8 +159,10 @@ public final class PeriodicRenderer {
         Comparator.<BlockPos>comparingInt(p -> surfaceSections.contains(p) ? 0 : 1)
             .thenComparingDouble(
             p -> {
-              var delta = d.delta(eye, Vec3.atCenterOf(p.offset(8, 8, 8)));
-              return delta.lengthSqr();
+              double dx = PeriodicMath.wrap(p.getX() + 8.5 - eye.x, d.size());
+              double dy = p.getY() + 8.5 - eye.y;
+              double dz = PeriodicMath.wrap(p.getZ() + 8.5 - eye.z, d.size());
+              return dx * dx + dy * dy + dz * dz;
             }));
     pendingSections = pending.size() + jobs.size();
     var regions = new RenderRegionCache();
@@ -240,7 +248,7 @@ public final class PeriodicRenderer {
             // A fully enclosed opaque cube has no emitted faces. Avoid model/layer/AO work.
             if (state.getFluidState().isEmpty() && state.isSolidRender(region, p)) {
               boolean enclosed = true;
-              for (var face : net.minecraft.core.Direction.values()) {
+              for (var face : faces) {
                 neighbor.setWithOffset(p, face);
                 if (!region.getBlockState(neighbor).isSolidRender(region, neighbor)) {
                   enclosed = false;
@@ -296,7 +304,9 @@ public final class PeriodicRenderer {
     shader.getUniform("PlanetRadius").set((float) d.radius());
     shader.getUniform("Eye").set((float) eye.x, (float) eye.y, (float) eye.z);
     try {
-      var ordered = new ArrayList<>(meshes.values());
+      var ordered = new ArrayList<Mesh>();
+      for (var mesh : meshes.values())
+        if (mesh.layers[layer] != null && visibleSections.contains(mesh.origin)) ordered.add(mesh);
       if (layer == 3)
         ordered.sort(
             Comparator.comparingDouble(
